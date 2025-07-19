@@ -3,9 +3,51 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token }}">
     <title>Document</title>
 </head>
 <body>
     <h3>Hello {{ request.user.email }}</h3>
+
+    <button type="button" onclick="logOutUser()">Logout</button>
+
+    <script>
+        async function logOutUser() {
+
+            const refreshToken = localStorage.getItem('refresh_token')
+
+            if(!refreshToken){
+                console.warn('No refresh token available, user already logged out')
+                return;
+            }
+
+            try{
+                const response = await fetch('/account/api/logout/', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                        'Content-Type': 'application/json',
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({refresh_token: refreshToken})
+                })
+
+                const data = await response.json()
+
+                if (response.ok){
+                    localStorage.removeItem('access_token')
+                    localStorage.removeItem('refresh_token')
+
+                    alert('Logout Successfully')
+
+                    window.location.href = '/account/login/'
+                } else{
+                    console.log(data.detail)
+                }
+            } catch(error){
+                console.error(Error)
+            }
+        }
+    </script>
 </body>
 </html>

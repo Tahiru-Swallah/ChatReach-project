@@ -54,7 +54,7 @@ class CustomTokenObtainPairView(TokenObtainPairView):
 
         return response
 
-@api_view
+@api_view(['POST'])
 @authentication_classes([])
 @permission_classes([AllowAny])
 @csrf_exempt   
@@ -87,3 +87,20 @@ def registration(request):
         return response
     
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def logout(request):
+    refresh_token = request.data.get('refresh_token')
+
+    if refresh_token:
+        try:
+            token = RefreshToken(refresh_token)
+            token.blacklist()
+        except Exception as e:
+            return Response({'detail': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    
+    response = Response({"message": 'Logout Successful'}, status=status.HTTP_200_OK)
+    response.delete_cookie('access_token')
+
+    return response

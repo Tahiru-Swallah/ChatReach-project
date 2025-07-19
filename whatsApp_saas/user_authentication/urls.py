@@ -1,7 +1,7 @@
 from django.urls import path
 from rest_framework_simplejwt.views import TokenRefreshView
 
-from .views import home, CustomTokenObtainPairView, registration, loginForm, registerForm
+from .views import home, CustomTokenObtainPairView, registration, loginForm, registerForm, logout
 
 app_name = 'user_authentication'
 
@@ -15,7 +15,8 @@ urlpatterns = [
     #REGISTER APIs URL
     path('api/register/', registration, name='register'),
 
-
+    #LOGOUT API
+    path('api/logout/', logout, name='logout'),
 
     #TEMPLATE URLS FOR CONSUMING THE ABOVE APIs
     path('login/', loginForm, name='login'),
