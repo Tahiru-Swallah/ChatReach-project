@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    <form id="loginForm">
+        <input type="text" id="emailOrPhone" name="email_or_phonenumber" placeholder="Email or Phone" required><br>
+        <input type="password" id="password" name="password" placeholder="Password" required><br>
+        <button type="submit">Login</button> 
+    </form>
+
+
+    <script>
+        document.getElementById("loginForm").addEventListener('submit', async function(e) {
+            e.preventDefault()
+
+            const email_or_phonenumber = document.getElementById("emailOrPhone").value
+            const password = document.getElementById("password").value
+
+            console.log(email_or_phonenumber)
+
+            try{
+                const response = await fetch('/account/api/login/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({email_or_phonenumber, password})
+                })
+
+                const data = await response.json()
+
+                if (response.ok){
+                    localStorage.setItem('access_token', data.access_token)
+                    localStorage.setItem('refresh_token', data.refresh_token)
+
+                    alert('Login Successfully')
+
+                    window.location.href = '/account/'
+
+                } else{
+                    alert(data.detail || 'login failed')
+                    throw new Error(response.statusText)
+                }
+
+            } catch(error){
+                console.error(Error)
+            }
+        })
+    </script>
+</body>
+</html>
