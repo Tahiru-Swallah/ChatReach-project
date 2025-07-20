@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token }}">
     <title>Document</title>
 </head>
 <body>
@@ -14,8 +15,33 @@
         <a href="{% url 'user_authentication:register'%}">Sign Up</a>
     </form>
 
+    <div id="g_id_signin"></div>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
 
     <script>
+        window.onload = function () {
+            google.accounts.id.initialize({
+            client_id: "{{ GOOGLE_AUTH_CLIENT_ID }}",
+            callback: handleCredentialResponse,
+            auto_select: true, // ✅ force show account chooser
+            cancel_on_tap_outside: true,
+            context: 'signin'
+            });
+
+            google.accounts.id.renderButton(
+            document.getElementById("g_id_signin"), {
+                theme: "outline",
+                size: "medium",
+                type: "standard",
+                text: "sign_in_with",
+                shape: "rectangular"
+            }
+            );
+            
+            // Optional: trigger popup immediately (like Pinterest)
+            google.accounts.id.prompt();
+        };
+
         document.getElementById("loginForm").addEventListener('submit', async function(e) {
             e.preventDefault()
 
@@ -53,6 +79,41 @@
                 console.error(Error)
             }
         })
+
+        async function handleCredentialResponse(response){
+            const id_token = response.credential
+
+            try{
+                const response = await fetch('/account/google/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        "X-CSRFToken": "{{ csrf_token }}"
+                    },
+                    body: JSON.stringify({
+                        provider: 'google',
+                        id_token: id_token
+                    })
+                })
+
+                const data = await response.json()
+
+                if (response.ok && data.access_token){
+                    localStorage.setItem('access_token', data.access_token)
+                    localStorage.setItem('refresh_token', data.refresh_token)
+
+                    alert('Login successful')
+
+                    window.location.href = '/account/'
+
+                } else{
+                    alert(data.detail || 'login failed')
+                }
+
+            } catch(error){
+                console.error(error)
+            }
+        }
     </script>
 </body>
 </html>

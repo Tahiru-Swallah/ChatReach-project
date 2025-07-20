@@ -1,6 +1,7 @@
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required 
 from django.views.decorators.csrf import csrf_exempt
+from django.conf import settings
 
 # REST FRAMEWORK LIBRARIES
 from rest_framework.views import APIView
@@ -16,9 +17,62 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from .models import CustomUser
 from .serializer import CustomTokenObtainPairSerializer, RegisterSerializer
 
+# GOOGLE AUTH LIBRARIES
+from dj_rest_auth.registration.views import SocialLoginView
+from allauth.socialaccount.providers.google.views import GoogleOAuth2Adapter
+from allauth.socialaccount.providers.oauth2.client import OAuth2Client
+
+class GoogleLoginAPI(SocialLoginView):
+    adapter_class = GoogleOAuth2Adapter
+
+    def post(self, request, *args, **kwargs):
+        id_token = request.data.get('id_token')
+
+        if not id_token:
+            return Response({'detail': 'Missing ID token'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            from google.oauth2 import id_token as google_id_token
+            from google.auth.transport import requests
+
+            id_info = google_id_token.verify_oauth2_token(
+                id_token,
+                requests.Request(),
+                settings.GOOGLE_SOCIAL_AUTH_ID
+            )
+
+            email = id_info['email']
+            name = id_info.get('name')
+
+            user, create = CustomUser.objects.get_or_create(email=email)
+
+            refresh = RefreshToken.for_user(user)
+            access_token = str(refresh.access_token)
+
+            response = Response({
+                'access_token': access_token,
+                'refresh_token': str(refresh)
+            })
+
+            response.set_cookie(
+                'access_token',
+                access_token,
+                httponly=True,
+                secure=False,  # Change to True in production (with HTTPS)
+                samesite='Lax',
+                max_age=3600
+            )
+
+            return response
+        
+        except ValueError:
+            return Response({'detail': 'Invalid google token'}, status=status.HTTP_400_BAD_REQUEST)
+
+
 # TEMPLATE FOR CONSUMING BELOW APIs
 def loginForm(request):
-    return render(request, 'registration/login.html')
+    context = {'GOOGLE_AUTH_CLIENT_ID' : settings.GOOGLE_SOCIAL_AUTH_ID}
+    return render(request, 'registration/login.html', context)
 
 def registerForm(request):
     return render(request, 'registration/register.html')

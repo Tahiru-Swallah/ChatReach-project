@@ -13,6 +13,8 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 from pathlib import Path
 from datetime import timedelta
 
+from decouple import config
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -26,12 +28,19 @@ SECRET_KEY = 'django-insecure-nk$ufq1p0rh^h8*k)^^#@@x1x=$+5$d00+fm9)^1l+l!offzw$
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['chatReach.com', 'localhost', '127.0.0.1']
 
 AUTH_USER_MODEL = 'user_authentication.CustomUser'
 
+ACCOUNT_USER_MODEL_USERNAME_FIELD = None
+ACCOUNT_LOGIN_METHODS = {'email'}
+ACCOUNT_SIGNUP_FIELDS = ['email*', 'password1*', 'password2*']
+
 LOGOUT_REDIRECT_URL = 'user_authentication:login'
 LOGIN_URL = 'user_authentication:login'
+
+GOOGLE_SOCIAL_AUTH_SECRET = config('GOOGLE_CLIENT_SECRET')
+GOOGLE_SOCIAL_AUTH_ID = config('GOOGLE_CLIENT_ID')
 
 # Application definition
 
@@ -49,7 +58,18 @@ INSTALLED_APPS = [
 
     #Third-party Library
     'rest_framework_simplejwt.token_blacklist',
+    'django_extensions',
+    'social_django',
+    'dj_rest_auth',
+    'dj_rest_auth.registration',
+    'rest_framework.authtoken',
+    'allauth',
+    'allauth.account',
+    'allauth.socialaccount',
+    'allauth.socialaccount.providers.google',
 ]
+
+
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -58,6 +78,7 @@ MIDDLEWARE = [
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'user_authentication.middleware.jwt.JWTAuthenticationMiddleware',
+    'allauth.account.middleware.AccountMiddleware', 
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -102,6 +123,16 @@ SIMPLE_JWT = {
     'BLACKLIST_AFTER_ROTATION': True,
     'AUTH_HEADER_TYPES': ('Bearer',),
 }
+
+CORS_ALLOW_CREDENTIALS = True
+
+CSRF_COOKIE_HTTPONLY = False
+
+CSRF_COOKIE_SECURE = False
+
+SESSION_COOKIE_SECURE = False  
+
+SECURE_SSL_REDIRECT = False     # ✅ Redirect all HTTP to HTTPS
 
 WSGI_APPLICATION = 'whatsApp_saas.wsgi.application'
 

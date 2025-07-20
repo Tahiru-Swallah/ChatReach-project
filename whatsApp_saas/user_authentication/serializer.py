@@ -1,8 +1,15 @@
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from django.contrib.auth.password_validation import validate_password
+from dj_rest_auth.registration.serializers import SocialLoginSerializer
 from .models import CustomUser
 
+class CustomGoogleLoginSerializer(SocialLoginSerializer):
+    id_token = serializers.CharField(required=True, allow_blank=True)
+
+    def validate(self, attrs):
+        attrs['access_token'] = attrs['id_token']
+        return super().validate(attrs)
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     username_field = 'email_or_phonenumber'
 
