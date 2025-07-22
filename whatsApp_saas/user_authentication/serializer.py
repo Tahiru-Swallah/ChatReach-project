@@ -2,7 +2,7 @@ from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from django.contrib.auth.password_validation import validate_password
 from dj_rest_auth.registration.serializers import SocialLoginSerializer
-from .models import CustomUser
+from .models import CustomUser, BusinessProfile
 
 class CustomGoogleLoginSerializer(SocialLoginSerializer):
     id_token = serializers.CharField(required=True, allow_blank=True)
@@ -81,3 +81,28 @@ class RegisterSerializer(serializers.ModelSerializer):
         user.save()
 
         return user
+    
+
+class BusinessProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BusinessProfile
+        fields = [
+            'id',
+            'user',
+            'business_name',
+            'phone_number',
+            'email',
+            'website',
+            'description',
+            'location',
+            'is_registered',
+            'is_premium',
+            'created_on'
+        ]
+
+        read_only_fields = ['id', 'user', 'is_registered', 'is_premium', 'created_on']
+
+        def create(self, validated_data):
+            user = self.context['request'].user
+            validated_data['user'] = user
+            return super().create(validated_data)

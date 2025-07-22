@@ -14,13 +14,40 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.tokens import RefreshToken
 
 # LOCAL LIBRARIES
-from .models import CustomUser
-from .serializer import CustomTokenObtainPairSerializer, RegisterSerializer
+from .models import CustomUser, BusinessProfile
+from .serializer import CustomTokenObtainPairSerializer, RegisterSerializer, BusinessProfileSerializer
 
 # GOOGLE AUTH LIBRARIES
 from dj_rest_auth.registration.views import SocialLoginView
 from allauth.socialaccount.providers.google.views import GoogleOAuth2Adapter
 from allauth.socialaccount.providers.oauth2.client import OAuth2Client
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def create_or_update_business_profile(request):
+    try:
+        profile = BusinessProfile.objects.get(user=request.user)
+        serializer = BusinessProfileSerializer(profile, data=request.data, partial=True, context = {'request': request})
+    
+    except BusinessProfile.DoesNotExist:
+        serializer = BusinessProfileSerializer(data=request.data, context = {'request': request})
+
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_business_profile(request):
+    try:
+        profile = BusinessProfile.objects.get(user=request.user)
+        serializer = BusinessProfileSerializer(profile)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    except BusinessProfile.DoesNotExist:
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class GoogleLoginAPI(SocialLoginView):
     adapter_class = GoogleOAuth2Adapter
