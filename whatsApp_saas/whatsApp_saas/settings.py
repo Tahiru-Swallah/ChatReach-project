@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     'jazzmin',
     'rest_framework',
     'user_authentication.apps.UserAuthenticationConfig',
+    'user_business.apps.UserBusinessConfig',
     'phonenumber_field',
     'django.contrib.admin',
     'django.contrib.auth',
@@ -58,6 +59,8 @@ INSTALLED_APPS = [
 
     #Third-party Library
     'rest_framework_simplejwt.token_blacklist',
+    'django_celery_results',
+    'django_celery_beat',
     'django_extensions',
     'social_django',
     'dj_rest_auth',
@@ -135,6 +138,15 @@ SESSION_COOKIE_SECURE = False
 SECURE_SSL_REDIRECT = False     # ✅ Redirect all HTTP to HTTPS
 
 WSGI_APPLICATION = 'whatsApp_saas.wsgi.application'
+
+# Celery settings
+CELERY_BROKER_URL = 'redis://localhost:6379/0'
+CELERY_RESULT_BACKEND = 'django-db'
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+
+CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers.DatabaseScheduler'
+
 
 
 # Database

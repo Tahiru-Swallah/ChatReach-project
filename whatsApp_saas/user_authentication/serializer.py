@@ -102,7 +102,7 @@ class BusinessProfileSerializer(serializers.ModelSerializer):
 
         read_only_fields = ['id', 'user', 'is_registered', 'is_premium', 'created_on']
 
-        def create(self, validated_data):
-            user = self.context['request'].user
-            validated_data['user'] = user
-            return super().create(validated_data)
+    def create(self, validated_data):
+        user = self.context['request'].user
+        validated_data['user'] = user
+        return super().create(validated_data)

@@ -74,6 +74,7 @@ class BusinessProfile(models.Model):
     is_registered = models.BooleanField(default=False)
     is_premium = models.BooleanField(default=False)
     created_on = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         verbose_name = 'Business Profile'
