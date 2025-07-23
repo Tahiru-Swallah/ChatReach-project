@@ -88,6 +88,13 @@ class TemplateCategorySerializer(serializers.ModelSerializer):
 class MessageTemplateSerializer(serializers.ModelSerializer):
     attachment = serializers.FileField(required=False, allow_null=True)
     external_link = serializers.URLField(required=False, allow_blank=True, allow_null=True)
+    category = TemplateCategorySerializer(read_only=True)
+    category_id = serializers.PrimaryKeyRelatedField(
+        queryset=TemplateCategory.objects.all(),
+        write_only=True,
+        source='category'
+    )
+
     class Meta:
         model = MessageTemplate
         fields = [
@@ -96,6 +103,7 @@ class MessageTemplateSerializer(serializers.ModelSerializer):
             'title',
             'content',
             'category',
+            'category_id',
             'attachment',
             'external_link',
             'is_favorite',
@@ -106,3 +114,8 @@ class MessageTemplateSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         validated_data['user'] = self.context['request'].user
         return super().create(validated_data)
+    
+    def validate_attachment(self, value):
+        if value and not value.name.lower().endswith(('.pdf', '.jpg', '.jpeg', '.png', '.docx')):
+            raise serializers.ValidationError("Unsupported file type.")
+        return value
