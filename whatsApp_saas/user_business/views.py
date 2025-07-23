@@ -5,8 +5,8 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
-from .models import CustomerContact, ScheduledMessage
-from .serializer import CustomerContactSerializer, ScheduledMessageSerializer
+from .models import CustomerContact, ScheduledMessage, TemplateCategory, MessageTemplate
+from .serializer import CustomerContactSerializer, ScheduledMessageSerializer, MessageTemplateSerializer, TemplateCategorySerializer
 import pandas as pd
 
 @api_view(['POST'])
@@ -141,3 +141,54 @@ def delete_scheduled_message(request, message_id):
         return Response({'message': 'Scheduled message deleted successfully.'}, status=status.HTTP_204_NO_CONTENT)
     except ScheduledMessage.DoesNotExist:
         return Response({'error': 'Scheduled message not found.'}, status=status.HTTP_404_NOT_FOUND)
+    
+@api_view(['POST', 'GET'])
+@permission_classes([IsAuthenticated])
+def create_and_list_template_category(request):
+    if request.method == 'GET':
+        categories = TemplateCategory.objects.filter(user=request.user)
+        serializer = TemplateCategorySerializer(categories, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    elif request.method == 'POST':
+        serializer = TemplateCategorySerializer(data=request.data, context={'request': request})
+        if serializer.is_valid():
+            serializer.save(user=request.user)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST', 'GET'])
+@permission_classes([IsAuthenticated])
+def create_list_message_template(request):
+    if request.method == 'GET':
+        message_template = MessageTemplate.objects.filter(user=request.user)
+        serializer = MessageTemplateSerializer(message_template, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    elif request.method == 'POST':
+        serializer = MessageTemplateSerializer(data=request.data, context={'request': request})
+        if serializer.is_valid():
+            serializer.save(user=request.user)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+
+@api_view(['PUT', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def edit_delete_message_template(request, pk):
+    try:
+        message = MessageTemplate.objects.get(pk=pk, user =request.user)
+    except MessageTemplate.DoesNotExist:
+        return Response({'detail': 'Message template does not exist'}, status=status.HTTP_400_BAD_REQUEST0)
+    
+    if request.method == 'PUT':
+        serializer = MessageTemplateSerializer(message, data=request.data, context={'request': request})
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_200_OK)
+    
+    elif request.method == 'DELETE':
+        message.delete()
+        return Response({'detail': 'Message template deleted successfully'}, status=status.HTTP_204_NO_CONTENT)

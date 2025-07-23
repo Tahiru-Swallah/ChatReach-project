@@ -17,5 +17,10 @@ urlpatterns = [
     path('api/schedule/message/create/', views.schedule_message, name='schedule_message'),
     path('api/schedule/messages/', views.list_schedule_messages, name="list_schedule_messages"),
     path('api/schedule/<uuid:message_id>/edit/', views.update_schedule_message, name='update_schedule_message'),
-    path('api/schedule/<uuid:message_id>/delete/', views.delete_scheduled_message, name='delete_schedule_message')
+    path('api/schedule/<uuid:message_id>/delete/', views.delete_scheduled_message, name='delete_schedule_message'),
+
+    #MESSAGE TEMPLATE CATEGORIES AND TEMPLATE APIs
+    path('api/category/create/', views.create_and_list_template_category, name='category'),
+    path('api/message/template/create/', views.create_list_message_template, name='template'),
+    path('api/message/<uuid:pk>/edit/delete/', views.edit_delete_message_template, name='message_template')
 ]
