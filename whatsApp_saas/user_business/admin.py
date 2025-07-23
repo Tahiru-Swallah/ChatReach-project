@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import CustomerContact, ScheduledMessage, MessageTemplate
+from .models import CustomerContact, ScheduledMessage, MessageTemplate, TemplateCategory
 
 @admin.register(CustomerContact)
 class CustomerContactAdmin(admin.ModelAdmin):
@@ -19,3 +19,6 @@ class ScheduledMessageAdmin(admin.ModelAdmin):
 @admin.register(MessageTemplate)
 class MesssageTemplateAdmin(admin.ModelAdmin):
     list_display = ['user', 'title', 'content', 'category', 'attachment', 'external_link', 'is_favorite', 'created_at']
+@admin.register(TemplateCategory)
+class TemplateCategoryAdmin(admin.ModelAdmin):
+    list_display = ['name', 'user', 'created_at']

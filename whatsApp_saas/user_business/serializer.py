@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import CustomerContact, ScheduledMessage, MessageTemplate
+from .models import CustomerContact, ScheduledMessage, MessageTemplate, TemplateCategory
 
 class CustomerContactSerializer(serializers.ModelSerializer):
     class Meta:
@@ -40,6 +40,54 @@ class MessageTemplateSerializer(serializers.ModelSerializer):
     attachment = serializers.FileField(required=False, allow_null=True)
     external_link = serializers.URLField(required=False, allow_blank=True, allow_null=True)
 
+    class Meta:
+        model = MessageTemplate
+        fields = [
+            'id',
+            'user',
+            'title',
+            'content',
+            'category',
+            'attachment',
+            'external_link',
+            'is_favorite',
+            'created_at',
+        ]
+        read_only_fields = ['id', 'user', 'created_at']
+
+    def create(self, validated_data):
+        validated_data['user'] = self.context['request'].user
+        return super().create(validated_data)
+class TemplateCategorySerializer(serializers.ModelSerializer):
+    name = serializers.ChoiceField(choices=TemplateCategory.CATEGORY_CHOICES)
+
+    class Meta:
+        model = TemplateCategory
+        fields = [
+            'id',
+            'name',
+            'user',
+            'created_at'
+        ]
+        read_only_fields = ['id', 'user', 'created_at']
+
+    def validate(self, attrs):
+        user = self.context['request'].user
+        name = attrs.get('name')
+
+        if TemplateCategory.objects.filter(user=user, name=name).exists():
+            raise serializers.ValidationError(
+                {"name": "You already have a category with this name."}
+            )
+        return attrs
+
+    def create(self, validated_data):
+        validated_data['user'] = self.context['request'].user
+        return super().create(validated_data)
+
+class MessageTemplateSerializer(serializers.ModelSerializer):
+    attachment = serializers.FileField(required=False, allow_null=True)
+    external_link = serializers.URLField(required=False, allow_blank=True, allow_null=True)
     class Meta:
         model = MessageTemplate
         fields = [

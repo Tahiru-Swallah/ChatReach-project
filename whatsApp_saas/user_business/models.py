@@ -42,7 +42,7 @@ class ScheduledMessage(models.Model):
     def __str__(self):
         return f"{self.user.username} - {self.message[:30]} ({self.status})"
 
-class MessageTemplate(models.Model):
+class TemplateCategory(models.Model):
     CATEGORY_CHOICES = [
         ('marketing', 'Marketing'),
         ('reminder', 'Reminder'),
@@ -50,7 +50,18 @@ class MessageTemplate(models.Model):
         ('support', 'Support'),
         ('custom', 'Custom'),
     ]
+    
+    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
+    name = models.CharField(max_length=100, choices=CATEGORY_CHOICES)
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='template_categories')
+    created_at = models.DateTimeField(auto_now_add=True)
+    class Meta:
+        unique_together = ['name', 'user']
+        verbose_name_plural = 'Template Categories'
 
+    def __str__(self):
+        return self.name
+class MessageTemplate(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
     title = models.CharField(max_length=150)
@@ -60,7 +71,7 @@ class MessageTemplate(models.Model):
         help_text="Use variables like {{name}}, {{date}}, {{business_name}} for dynamic content"
     )
     
-    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default='custom')
+    category = models.ForeignKey(TemplateCategory, on_delete=models.SET_NULL, null=True, blank=True)
     
     # Allow upload of images, PDFs, documents
     attachment = models.FileField(upload_to='template_attachments/', null=True, blank=True)
