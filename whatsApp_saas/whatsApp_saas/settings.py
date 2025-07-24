@@ -72,6 +72,9 @@ INSTALLED_APPS = [
     'allauth.socialaccount.providers.google',
 ]
 
+INFOBIP_API_KEY = config('INFOBIP_API_KEY')
+INFOBIP_BASE_URL = config('INFOBIP_BASE_URL')
+INFOBIP_SENDER = config('INFOBIP_SENDER')  # Infobip test sender
 
 
 MIDDLEWARE = [
