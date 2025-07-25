@@ -18,7 +18,7 @@ class ScheduledMessageAdmin(admin.ModelAdmin):
     
 @admin.register(MessageTemplate)
 class MesssageTemplateAdmin(admin.ModelAdmin):
-    list_display = ['user', 'title', 'content', 'category', 'attachment', 'external_link', 'is_favorite', 'created_at']
+    list_display = ['user', 'title', 'template_name', 'language', 'placeholders', 'category', 'attachment', 'external_link', 'is_favorite', 'created_at']
 @admin.register(TemplateCategory)
 class TemplateCategoryAdmin(admin.ModelAdmin):
     list_display = ['name', 'user', 'created_at']

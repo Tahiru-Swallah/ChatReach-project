@@ -2,6 +2,7 @@ from django.urls import path
 from rest_framework_simplejwt.views import TokenRefreshView
 
 from .views import home, CustomTokenObtainPairView, registration, loginForm, registerForm, logout, GoogleLoginAPI, get_business_profile, create_or_update_business_profile
+from . import views
 
 app_name = 'user_authentication'
 
@@ -28,4 +29,6 @@ urlpatterns = [
     #TEMPLATE URLS FOR CONSUMING THE ABOVE APIs
     path('login/', loginForm, name='login'),
     path('register/', registerForm, name='register'),
+
+    path('business/profile/', views.business_profile_form, name='business_profile'),
 ]

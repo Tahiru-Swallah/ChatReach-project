@@ -108,6 +108,10 @@ def registerForm(request):
 def home(request):
     return render(request, 'home.html', {})
 
+@login_required
+def business_profile_form(request):
+    return render(request,'whatsapp/profile.html', {})
+
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
 

@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    <form id="business_profile_form">
+        {% csrf_token %}
+        <input type="text" name="business_name" placeholder="Business Name" required /><br>
+        <input type="text" name="phone_number" placeholder="phone_number"/><br>
+        <input type="email" name="email" placeholder="email"/><br>
+        <input type="text" name="website" placeholder="website"/><br>
+        <input type="text" name="description" placeholder="description"/><br>
+        <input type="text" name="location" placeholder="location"/><br>
+        <button type="submit">Save Business Profile</button>
+    </form>
+
+    <div id="response-message"></div>
+
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const form = document.getElementById('business_profile_form');
+
+            form.addEventListener('submit', async function(e){
+                e.preventDefault()
+
+
+                const formData = new FormData(form);
+
+
+                try{
+                    const response = await fetch('/account/api/business/profile/', {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRFToken': document.querySelector('input[name="csrfmiddlewaretoken"]').value
+                        },
+                        body: formData
+                    })
+
+                    const data = await response.json()
+
+                    if (response.ok){
+                        document.getElementById("response-message").innerText = "✅ Profile saved successfully!";
+                        console.log("Success:", data);
+                    } else {
+                        document.getElementById("response-message").innerText = "❌ Error: " + JSON.stringify(data);
+                        console.error("Error:", data);
+                    }
+
+                } catch(error){
+                    console.error(error)
+                }
+            })
+        })
+    </script>
+</body>
+</html>

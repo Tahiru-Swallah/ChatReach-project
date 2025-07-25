@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token }}">
+    <title>Document</title>
+</head>
+<body>
+    <form id="schedule_form" enctype="multipart/form-data">
+        <textarea id="message" placeholder="Type message..." required></textarea><br>
+        <input type="datetime-local" id="scheduled_time" required><br>
+        <input type="file" id="media"><br>
+
+        <div class="contact-list">
+
+        </div>
+
+        <button type="submit">Schedule Message</button>
+    </form>
+
+
+    <script>
+        async function loadContacts(){
+            try{
+                const response = await fetch('/api/contacts/')
+
+                const contacts = await response.json()
+                console.log(contacts)
+
+                const contactList = document.querySelector('.contact-list')
+                contactList.innerHTML = ''
+
+                contacts.forEach(contact => {
+                    const label = document.createElement('label')
+                    label.innerHTML = `
+                        <input type="checkbox" name="contacts" value="${contact.id}">
+                        ${contact.name} - ${contact.phone_number}
+                    `
+                    contactList.appendChild(label)
+                    contactList.append(document.createElement('br'))
+                })
+            
+            } catch(error){
+                console.error(error)
+            } 
+        } 
+
+        loadContacts()
+
+        const form = document.getElementById('schedule_form')
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault()
+
+            const message = document.getElementById('message').value
+            const scheduledTime = document.getElementById('scheduled_time').value
+            const mediaFile = document.getElementById('media').files[0]
+            const contactCheckBoxes = document.querySelectorAll('input[name="contacts"]:checked')
+
+            const contactIDs = Array.from(contactCheckBoxes).map(cb => cb.value)
+
+            if (contactIDs.length === 0){
+                alert('Please select at least one contact.')
+                return
+            }
+
+            const formData = new FormData()
+            formData.append('message', message)
+            formData.append('scheduled_time', scheduledTime)
+            formData.append('contacts', contactIDs)
+            if(mediaFile){
+                formData.append('media', mediaFile)
+            }
+
+            try{
+
+                const response = await fetch('/api/schedule/message/create/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                    },
+                    body: formData
+                })
+
+                const data = await response.json()
+
+                if (response.ok){
+                    alert('Message scheduled successfully ✅')
+                    console.log('Scheduled:', data)
+                    form.reset()
+                } else{
+                    alert('Scheduling failed ❌')
+                    console.error('Error:', data)
+                } 
+
+            } catch(error){
+                console.error(error)
+            }
+        })  
+    </script>
+</body>
+</html>

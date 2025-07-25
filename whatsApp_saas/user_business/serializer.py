@@ -4,7 +4,7 @@ from .models import CustomerContact, ScheduledMessage, MessageTemplate, Template
 class CustomerContactSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomerContact
-        fields = ['id', 'user', 'phone_number', 'email', 'tag', 'created_on']
+        fields = ['id', 'user', 'name', 'phone_number', 'email', 'tag', 'created_on']
         read_only_fields = ['id', 'user', 'created_on']
 
     def create(self, validated_data):
@@ -23,13 +23,14 @@ class ScheduledMessageSerializer(serializers.ModelSerializer):
             'id',
             'user',
             'contacts',
-            'message_body',
-            'media_url',
+            'message',
+            'media',
             'scheduled_time',
             'status',
-            'created_on'
+            'created_at',
+            'updated_at',
         ]
-        read_only_fields = ['id', 'user', 'status', 'created_on']
+        read_only_fields = ['id', 'user', 'status', 'created_at', 'updated_at']
 
     def create(self, validated_data):
         user = self.context['request'].user
@@ -46,14 +47,16 @@ class MessageTemplateSerializer(serializers.ModelSerializer):
             'id',
             'user',
             'title',
-            'content',
+            'template_name',
+            'language',
+            'placeholders',
             'category',
             'attachment',
             'external_link',
             'is_favorite',
             'created_at',
         ]
-        read_only_fields = ['id', 'user', 'created_at']
+        read_only_fields = ['user', 'created_at']
 
     def create(self, validated_data):
         validated_data['user'] = self.context['request'].user

@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    <form id="customer_contact_form">
+        {% csrf_token %}
+        <input type="text" name="name" placeholder="Full Name" required /><br>
+        <input type="tel" name="phone_number" placeholder="Phone Number (e.g., +233...)" required /><br>
+        <input type="email" name="email" placeholder="Email (optional)" /><br>
+        <input type="text" name="tag" placeholder="Tag (optional)" /><br>
+        <button type="submit">Save Contact</button>
+    </form>
+
+    <form id="excel-upload-form">
+        {% csrf_token %}
+        <input type="file" name="file" accept=".xlsx" required />
+        <button type="submit">Upload Contacts</button>
+    </form>
+
+    <div id="upload-status"></div>
+
+    <div id="contact-response"></div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const form = document.getElementById('customer_contact_form');
+            const form2 = document.getElementById('excel-upload-form')
+
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+
+                const formData = new FormData(form)
+                const contactData = {
+                    name: formData.get("name"),
+                    phone_number: formData.get("phone_number"),
+                    email: formData.get("email"),
+                    tag: formData.get("tag")
+                }
+                console.log(contactData);
+
+                try{
+                    const response = await fetch('/api/contacts/create/', {
+                        method: 'POST',
+                        headers: {
+                            'content-type': 'application/json',
+                            'X-CSRFToken': document.querySelector('input[name="csrfmiddlewaretoken"]').value
+                        },
+                        body: JSON.stringify(contactData)
+                    })
+                    
+                    const data = await response.json()
+
+                    if(response.ok){
+                        document.getElementById("contact-response").innerText = "✅ Contact saved!";
+                        console.log("Created contact:", data);
+                        form.reset();
+                    } else{
+                        document.getElementById("contact-response").innerText = "❌ Error: " + JSON.stringify(data);
+                        console.error("Validation errors:", data);
+                    } 
+
+                } catch(error){
+                    console.error("Network error:", error);
+                } 
+            })  
+
+            form2.addEventListener('submit', async (e)=>{
+                e.preventDefault();
+
+                const formData2 = new FormData(form2)
+
+                for (const [key, value] of formData2.entries()) {
+                    console.log(`${key}:`, value);
+                } 
+
+                try{
+                    const response = await fetch('/api/contacts/import-excel/', {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRFToken': document.querySelector('input[name="csrfmiddlewaretoken"]').value
+                        }, 
+                        body: formData2
+                    })
+
+                    const data = await response.json()
+
+                    if (response.status == 207 || response.ok){
+                        const success = data.created?.length || 0;
+                        const failed = data.failed?.length || 0;
+                        const skipped = data.skip_duplicates?.length || 0;
+
+                        document.getElementById('upload-status').innerHTML = `
+                            ✅Imported ${success} contacts successfully. <br>
+                            ❌Failed to import ${failed} contacts.<br>
+                            ⚠️skipped ${skipped} duplicate contacts.`;
+
+                        console.log('Created:', data.created)
+                        console.log('Failed:', data.failed)
+                    } else {
+                        document.getElementById("upload-status").innerText = "❌ " + data.error;
+                        console.error("Error:", data.error);
+                    } 
+                    
+                } catch(error){
+                    console.error("Network error:", error); 
+                }
+
+            })
+        })   
+    </script>
+</body>
+</html>

@@ -64,26 +64,20 @@ class TemplateCategory(models.Model):
 class MessageTemplate(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
-    title = models.CharField(max_length=150)
-    
-    # The message with placeholders
-    content = models.TextField(
-        help_text="Use variables like {{name}}, {{date}}, {{business_name}} for dynamic content"
-    )
-    
+    title = models.CharField(max_length=100)
+    template_name = models.CharField(max_length=100, help_text="Infobip registered template name")
+    language = models.CharField(max_length=10, default="en")
+    placeholders = models.JSONField(blank=True, null=True, help_text="List of placeholder values for the template")
     category = models.ForeignKey(TemplateCategory, on_delete=models.SET_NULL, null=True, blank=True)
-    
-    # Allow upload of images, PDFs, documents
-    attachment = models.FileField(upload_to='template_attachments/', null=True, blank=True)
-
-    # Optional website, WhatsApp, or booking link
-    external_link = models.URLField(null=True, blank=True, help_text="Optional link to website or landing page")
-
+    attachment = models.FileField(upload_to='attachments/', null=True, blank=True)
+    external_link = models.URLField(blank=True, null=True)
     is_favorite = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        ordering = ['-created_at']
+        ordering = [
+            models.Index(fields=['-created_at'])
+        ]
 
     def __str__(self):
         return self.title

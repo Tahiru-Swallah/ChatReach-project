@@ -22,5 +22,12 @@ urlpatterns = [
     #MESSAGE TEMPLATE CATEGORIES AND TEMPLATE APIs
     path('api/category/create/', views.create_and_list_template_category, name='category'),
     path('api/message/template/create/', views.create_list_message_template, name='template'),
-    path('api/message/<uuid:pk>/edit/delete/', views.edit_delete_message_template, name='message_template')
+    path('api/message/<uuid:pk>/edit/delete/', views.edit_delete_message_template, name='message_template'),
+
+    #TEMPLATE SENDING API
+    path('api/send/message/', views.send_template_message, name='send_message_template'),
+
+    #TEMPLATE OF CONSUMING APIs NOW
+    path('contact/form/', views.contact_form, name='contact_form'),
+    path('schedule/message/', views.schedule_form, name='schedule_message_form'),
 ]

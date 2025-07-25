@@ -1,5 +1,7 @@
 from django.shortcuts import render
-
+from django.contrib.auth.decorators import login_required
+import phonenumbers
+from django.db import IntegrityError
 
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
@@ -8,6 +10,16 @@ from rest_framework import status
 from .models import CustomerContact, ScheduledMessage, TemplateCategory, MessageTemplate
 from .serializer import CustomerContactSerializer, ScheduledMessageSerializer, MessageTemplateSerializer, TemplateCategorySerializer
 import pandas as pd
+from .utils import send_whatsapp_message
+
+
+@login_required
+def contact_form(request):
+    return render(request, 'business/contact_form.html', {})
+
+@login_required
+def schedule_form(request):
+    return render(request, 'business/schedule_form.html', {})
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -26,7 +38,14 @@ def list_customer_contacts(request):
     serializer = CustomerContactSerializer(contacts, many=True)
     return Response(serializer.data, status=status.HTTP_200_OK)
 
-
+def clean_phone_number(number, region='GH'):
+    try:
+        parsed = phonenumbers.parse(str(number), region)
+        if phonenumbers.is_valid_number(parsed):
+            return phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.E164)
+    except Exception:
+        return None
+    
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def import_contacts_from_excel(request):
@@ -50,25 +69,45 @@ def import_contacts_from_excel(request):
             status=status.HTTP_400_BAD_REQUEST
         )
     
-    created, failed = [], []
+    df.fillna('', inplace=True)
+
+    created, failed, skip_duplicates = [], [], []
+    existing_numbers = set(
+        CustomerContact.objects.filter(user=request.user).values_list('phone_number', flat=True)
+    )
 
     for _, row in df.iterrows():
+        raw_number = row.get('phone_number')
+        cleaned_number = clean_phone_number(raw_number)
+
+        if not cleaned_number:
+            failed.append({'contact_data': row.to_dict(), 'errors': 'Invalid phone number format'})
+            continue
+            
+        if cleaned_number in existing_numbers:
+            skip_duplicates.append({'contact_data': row.to_dict(), 'errors': 'Contact already exists'})
+            continue
+            
         contact_data = {
             'name': row.get('name'),
-            'phone_number': row.get('phone_number'),
+            'phone_number': cleaned_number,
             'email': row.get('email', ''),
             'tag': row.get('tag', ''),
         } 
     
-    serializer = CustomerContactSerializer(data=contact_data, context = {'request': request})
-    if serializer.is_valid():
-        serializer.save()
-        created.append(serializer.data)
-    
-    else:
-        failed.append({'contact_data': contact_data, 'errors': serializer.errors})
+        serializer = CustomerContactSerializer(data=contact_data, context = {'request': request})
+        if serializer.is_valid():
+            try:
+                serializer.save()
+                created.append(serializer.data)
+                existing_numbers.add(cleaned_number)
 
-    return Response({'created': created, 'failed': failed}, status=status.HTTP_207_MULTI_STATUS)
+            except IntegrityError:
+                skip_duplicates.append({'contact_data': row.to_dict(), 'reason': 'Duplicate phone number (caught during save)'})
+        else:
+            failed.append({'contact_data': contact_data, 'errors': serializer.errors})
+
+    return Response({'created': created, 'failed': failed, 'skip_duplicates': skip_duplicates}, status=status.HTTP_207_MULTI_STATUS)
 
 
 @api_view(['PUT'])
@@ -101,12 +140,16 @@ def delete_customer_contact(request, pk):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def schedule_message(request):
+    print("Incoming Data:", dict(request.data))
+    print("FILES:", request.FILES)
+
     serializer = ScheduledMessageSerializer(data=request.data, context={'request': request})
 
     if serializer.is_valid():
         serializer.save()
         return Response(serializer.data, status=status.HTTP_200_OK)
     
+    print("Serializer Errors:", serializer.errors)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['GET'])
@@ -192,3 +235,45 @@ def edit_delete_message_template(request, pk):
     elif request.method == 'DELETE':
         message.delete()
         return Response({'detail': 'Message template deleted successfully'}, status=status.HTTP_204_NO_CONTENT)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def send_template_message(request):
+    template_id = request.data.get('template_id')
+    contact_ids = request.data.get('contact_ids')
+
+    if not template_id and not contact_ids:
+        return Response({'error': 'Temaplate_Id and contact_id are required'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    try:
+        template = MessageTemplate.objects.get(id=template_id, user=request.user)
+        contacts = CustomerContact.objects.filter(id__in=contact_ids, user=request.user)
+
+        success = []
+        failed = []
+
+        for contact in contacts:
+            try:
+                send_whatsapp_message(
+                    phone_number=contact.phone_number,
+                    message_text=template,
+                )
+                success.append(contact.phone_number)
+
+            except Exception as e:
+                failed.append({
+                    "phone": contact.phone_number,
+                    "error": str(e)
+                })
+
+        return Response({
+            "message": "Message processing completed",
+            "success": success,
+            "failed": failed
+        }, status=status.HTTP_200_OK)
+    
+    except MessageTemplate.DoesNotExist:
+        return Response({'error': 'Template does not exist'}, status=status.HTTP_404_NOT_FOUND)
+    
+    except Exception as e:
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
