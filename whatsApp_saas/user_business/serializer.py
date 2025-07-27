@@ -92,11 +92,6 @@ class MessageTemplateSerializer(serializers.ModelSerializer):
     attachment = serializers.FileField(required=False, allow_null=True)
     external_link = serializers.URLField(required=False, allow_blank=True, allow_null=True)
     category = TemplateCategorySerializer(read_only=True)
-    category_id = serializers.PrimaryKeyRelatedField(
-        queryset=TemplateCategory.objects.all(),
-        write_only=True,
-        source='category'
-    )
 
     class Meta:
         model = MessageTemplate
@@ -104,9 +99,10 @@ class MessageTemplateSerializer(serializers.ModelSerializer):
             'id',
             'user',
             'title',
-            'content',
+            'template_name',
+            'language',
+            'placeholders',
             'category',
-            'category_id',
             'attachment',
             'external_link',
             'is_favorite',

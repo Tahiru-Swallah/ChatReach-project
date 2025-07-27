@@ -21,7 +21,24 @@
 
     <ul id="category-list"></ul>
 
+    <form id="template_form" enctype="multipart/form-data">
+        <input type="text" id="title" placeholder="Template title" required><br>
+        <input type="text" id="template_name" placeholder="Template Name" required><br>
+        <input type="text" id="language" value="en" required><br>
+        <select id="category_id" required><br>
+            <option value="">Select Catgory</option>
+        </select>
+        <input type="file" id="attachment"><br>
+        <input type="url" id="external_url" placeholder="External Link"><br>
+        <textarea id="placeholder" placeholder="[{name: value}] JSON format"></textarea><br>
+        <label for="">
+            <input type="checkbox" id="is_favorite"> Favorite
+        </label><br>
+        <button type="submit">Create Template</button>
+    </form>
+
     <script>
+        
         async function loadCategories(){
             try{
                 const response = await fetch('/api/category/create/')
@@ -38,13 +55,21 @@
                         `
                         list.appendChild(li)
                     })
+
+                    /* Categories for sselecting template */
+                    const select = document.getElementById('category_id')
+                    categories.forEach(cat => {
+                        const option = document.createElement('option')
+                        option.value = cat.id
+                        option.textContent = cat.name.charAt(0).toUpperCase() + cat.name.slice(1)
+
+                        select.appendChild(option)
+                    })
                 }
             } catch(error){
                 console.log(error)
             }
         }
-
-        loadCategories()
 
         document.getElementById('category-form').addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -71,6 +96,66 @@
                 console.error(error);
             }
         })
+
+        document.getElementById('template_form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const formData = new FormData()
+
+            formData.append('title', document.getElementById('title').value)
+            formData.append('template_name', document.getElementById('template_name').value)
+            formData.append('language', document.getElementById('language').value || 'en')
+            formData.append('category', document.getElementById('category_id').value)
+            formData.append('external_link', document.getElementById('external_url').value);
+            formData.append('is_favorite', document.getElementById('is_favorite').checked);
+
+            const placeholderField = document.getElementById('placeholder')
+            if (placeholderField && placeholderField.value.trim() !== ''){
+                try{
+                    const parse = JSON.parse(placeholderField.value)
+                    formData.append('placeholders', JSON.stringify(parse))
+                } catch(error){
+                    console.error(error)
+                    alert('Invalid Json Parser in the placeholder field')
+                    return;
+                }
+            }
+
+            const attachment = document.getElementById('attachment').files[0]
+            if (attachment){
+                formData.append('attachment', attachment)
+            }
+
+            for(let [key, value] of formData.entries()){
+                console.log(`${key}:`, value)
+            }
+
+            try{
+                const response = await fetch('/api/message/template/create/', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                    },
+                    body: formData
+                })
+
+                const data = await response.json()
+                if(response.ok){
+                    alert('Message template created successfully!')
+                    document.getElementById('template_form').reset()
+                } else{ 
+                    console.log('error', data)
+                    alert('failed to create template')
+                }
+
+            } catch(error){
+                console.error(error)
+            }
+        })
+
+        window.onload = () => {
+            loadCategories()
+        }
     </script>
 </body>
 </html>
