@@ -17,16 +17,25 @@
         </div>
 
         <button type="submit">Schedule Message</button>
+
+        <hr>
+
+        <h2>Scheduled Messages</h2>
+        <div id="scheduled-messages"></div>
     </form>
 
 
     <script>
+
+        document.addEventListener('DOMContentLoaded', async (e) => {
+            await loadContacts()
+            await loadScheduledMessages()
+        })
         async function loadContacts(){
             try{
                 const response = await fetch('/api/contacts/')
 
                 const contacts = await response.json()
-                console.log(contacts)
 
                 const contactList = document.querySelector('.contact-list')
                 contactList.innerHTML = ''
@@ -45,8 +54,6 @@
                 console.error(error)
             } 
         } 
-
-        loadContacts()
 
         const form = document.getElementById('schedule_form')
 
@@ -68,7 +75,9 @@
             const formData = new FormData()
             formData.append('message', message)
             formData.append('scheduled_time', scheduledTime)
-            formData.append('contacts', contactIDs)
+            contactIDs.forEach(id => {
+                formData.append('contacts', id)
+            })
             if(mediaFile){
                 formData.append('media', mediaFile)
             }
@@ -78,7 +87,6 @@
                 const response = await fetch('/api/schedule/message/create/', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
                         'x-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
                     },
                     body: formData
@@ -99,6 +107,78 @@
                 console.error(error)
             }
         })  
+
+        async function loadScheduledMessages(){
+            try{
+                const response = await fetch('/api/schedule/messages/')
+
+                const messages = await response.json()
+                console.log(messages)
+
+                const messageCard = document.getElementById('scheduled-messages')
+                messageCard.innerHTML = ''
+
+                messages.forEach(msg => {
+                    const scheduledFor = new Date(msg.scheduled_time);
+
+                    // Get day of the week (e.g., Monday)
+                    const weekday = scheduledFor.toLocaleDateString('en-US', { weekday: 'long' });
+
+                    // Format full date with 12-hour time and AM/PM
+                    const formattedDate = scheduledFor.toLocaleString('en-US', {
+                        hour: 'numeric',
+                        minute: 'numeric',
+                        hour12: true,
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                    });
+                    
+                    const li = document.createElement('li')
+                    li.innerHTML = `
+                        <strong>Message: <strong/>${msg.message} <br>
+                        <strong>Schedule Time: <strong/>${weekday}, ${formattedDate}<br>
+                        <strong>Status: <strong/>${msg.status} <br>
+                        <strong>Time created: <strong/>${new Date(msg.created_at).toLocaleString('en-US', {
+                            hour: 'numeric',
+                            minute: 'numeric',
+                            hour12: true,
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric',
+                        })}<br> 
+                        
+                        <button onclick="deleteScheduleMessage('${msg.id}')">Delete Message</button>
+                        <hr>`
+
+                    messageCard.append(li)
+                })
+
+            } catch(error){
+                console.error(error)
+            }
+        }
+
+        async function deleteScheduleMessage(messageId){
+            try{
+                const response = await fetch(`/api/schedule/${messageId}/delete/`, {
+                    method: 'DELETE',
+                    headers: {
+                        'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                    }
+                })
+
+                if (response.status === 204){
+                    alert('Message delete successfully')
+                    window.location.reload()
+                } else{
+                    const data = await response.json();
+                    alert(`Error: ${data.error || 'Something went wrong'}`);
+                }
+            } catch(error){
+                console.error(error)
+            }
+        }
     </script>
 </body>
 </html>

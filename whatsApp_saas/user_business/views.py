@@ -21,6 +21,10 @@ def contact_form(request):
 def schedule_form(request):
     return render(request, 'business/schedule_form.html', {})
 
+@login_required
+def template_form(request):
+    return render(request, 'business/template_form.html', {})
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def create_customer_contact(request):
@@ -155,7 +159,7 @@ def schedule_message(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def list_schedule_messages(request):
-    messages = ScheduledMessage.objects.filter(user=request.user).order_by('-scheduled_time')
+    messages = ScheduledMessage.objects.filter(user=request.user).order_by('-created_at')
     serializer = ScheduledMessageSerializer(messages, many=True)
     return Response(serializer.data, status=status.HTTP_200_OK)
 

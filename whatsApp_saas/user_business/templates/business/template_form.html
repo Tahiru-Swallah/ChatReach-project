@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token }}">
+    <title>Document</title>
+</head>
+<body>
+    <form id="category-form">
+        <select id="category_name" required>
+            <option value="">Select category</option>
+            <option value="marketing">Marketing</option>
+            <option value="reminder">Reminder</option>
+            <option value="update">Update</option>
+            <option value="support">Support</option>
+            <option value="custom">Custom</option>
+        </select> <br>
+        <button type="submit">Add Category</button>
+    </form>
+
+    <ul id="category-list"></ul>
+
+    <script>
+        async function loadCategories(){
+            try{
+                const response = await fetch('/api/category/create/')
+
+                if (response.ok){
+                    const categories = await response.json()
+                    const list = document.getElementById('category-list')
+                    list.innerHTML = ''
+
+                    categories.forEach(cat => { 
+                        const li = document.createElement('li')
+                        li.textContent = `
+                            ${cat.name.charAt(0).toUpperCase() + cat.name.slice(1)} (created: ${new Date(cat.created_at).toLocaleString()})
+                        `
+                        list.appendChild(li)
+                    })
+                }
+            } catch(error){
+                console.log(error)
+            }
+        }
+
+        loadCategories()
+
+        document.getElementById('category-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const name = document.getElementById('category_name').value
+
+            try{
+                const response = await fetch('/api/category/create/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                    },
+                    body: JSON.stringify({name: name})
+                })
+
+                if(response.ok){
+                    alert('category created')
+                } else{
+                    const errorData= await response.json()
+                    alert('Error creating category:', errorData)
+                }
+            } catch(error){
+                console.error(error);
+            }
+        })
+    </script>
+</body>
+</html>

@@ -30,4 +30,5 @@ urlpatterns = [
     #TEMPLATE OF CONSUMING APIs NOW
     path('contact/form/', views.contact_form, name='contact_form'),
     path('schedule/message/', views.schedule_form, name='schedule_message_form'),
+    path('template/form/', views.template_form, name='template_form'),
 ]
