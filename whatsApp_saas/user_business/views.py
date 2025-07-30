@@ -209,7 +209,7 @@ def create_and_list_template_category(request):
 @permission_classes([IsAuthenticated])
 def create_list_message_template(request):
     if request.method == 'GET':
-        message_template = MessageTemplate.objects.filter(user=request.user)
+        message_template = MessageTemplate.objects.filter(user=request.user).select_related('category')
         serializer = MessageTemplateSerializer(message_template, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
     

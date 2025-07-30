@@ -2,6 +2,8 @@ from django.db import models
 from user_authentication.models import CustomUser, BusinessProfile
 from uuid import uuid4
 from phonenumber_field.modelfields import PhoneNumberField
+from django.contrib.contenttypes.fields import GenericForeignKey
+from django.contrib.contenttypes.models import ContentType
 
 
 class CustomerContact(models.Model):
@@ -75,9 +77,38 @@ class MessageTemplate(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        ordering = [
+        ordering = ['-created_at']
+        indexes = [
             models.Index(fields=['-created_at'])
         ]
 
     def __str__(self):
         return self.title
+    
+class Notification(models.Model):
+    TYPE_CHOICE = [
+        ('info', 'Info'),
+        ('success', 'Success'),
+        ('warning', 'Warning'),
+        ('error', 'Error'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='notification')
+    title = models.CharField(max_length=255)
+    message = models.TextField()
+    type = models.CharField(max_length=100, choices=TYPE_CHOICE, default='info')
+    is_read = models.BooleanField(default=False)
+
+    content_type = models.ForeignKey(ContentType, on_delete=models.SET_NULL, null=True, blank=True)
+    object_id = models.UUIDField(null=True, blank=True)
+    related_object = GenericForeignKey('content_type', 'object_id')
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.user.first_name} - {self.title}'

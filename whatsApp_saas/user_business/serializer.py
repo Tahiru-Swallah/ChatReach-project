@@ -91,7 +91,15 @@ class TemplateCategorySerializer(serializers.ModelSerializer):
 class MessageTemplateSerializer(serializers.ModelSerializer):
     attachment = serializers.FileField(required=False, allow_null=True)
     external_link = serializers.URLField(required=False, allow_blank=True, allow_null=True)
-    category = TemplateCategorySerializer(read_only=True)
+    
+    # Accept category ID from POST data
+    category = serializers.PrimaryKeyRelatedField(
+        queryset=TemplateCategory.objects.all(),
+        write_only=True
+    )
+
+    # Return nested category in the response
+    category_detail = TemplateCategorySerializer(source='category', read_only=True)
 
     class Meta:
         model = MessageTemplate
@@ -103,6 +111,7 @@ class MessageTemplateSerializer(serializers.ModelSerializer):
             'language',
             'placeholders',
             'category',
+            'category_detail',
             'attachment',
             'external_link',
             'is_favorite',

@@ -37,6 +37,8 @@
         <button type="submit">Create Template</button>
     </form>
 
+    <ul id="template-list"></ul>
+
     <script>
         
         async function loadCategories(){
@@ -143,6 +145,7 @@
                 if(response.ok){
                     alert('Message template created successfully!')
                     document.getElementById('template_form').reset()
+                    loadTemplate()
                 } else{ 
                     console.log('error', data)
                     alert('failed to create template')
@@ -153,8 +156,37 @@
             }
         })
 
+        async function loadTemplate(){
+            try{
+                const response = await fetch('/api/message/template/create/')
+
+                if(response.ok){
+
+                    const templates = await response.json()
+                    const list = document.getElementById('template-list')
+                    list.innerHTML = ''
+                    console.log(templates)
+
+                    templates.forEach(template => {
+                        const li = document.createElement('li')
+                        li.textContent = `${template.title} (${template.template_name}) - ${template.category_detail?.name || 'No Category'} - ${new Date(template.created_at).toLocaleString()}`;
+
+                        list.appendChild(li)
+                    })
+
+                } else{
+                    const errorData = await response.json()
+                    console.log(errorData)
+                    alert('Template load failed')
+                }
+            } catch(error){
+                console.error(error)
+            }
+        }
+
         window.onload = () => {
             loadCategories()
+            loadTemplate()
         }
     </script>
 </body>

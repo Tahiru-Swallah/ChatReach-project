@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import CustomerContact, ScheduledMessage, MessageTemplate, TemplateCategory
+from .models import CustomerContact, ScheduledMessage, MessageTemplate, TemplateCategory, Notification
 
 @admin.register(CustomerContact)
 class CustomerContactAdmin(admin.ModelAdmin):
@@ -22,3 +22,7 @@ class MesssageTemplateAdmin(admin.ModelAdmin):
 @admin.register(TemplateCategory)
 class TemplateCategoryAdmin(admin.ModelAdmin):
     list_display = ['name', 'user', 'created_at']
+
+@admin.register(Notification)
+class NotificationAdmin(admin.ModelAdmin):
+    list_display = ['user', 'title', 'message', 'type', 'is_read', 'created_at']
