@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import CustomerContact, ScheduledMessage, MessageTemplate, TemplateCategory
+from .models import CustomerContact, ScheduledMessage, MessageTemplate, TemplateCategory, Notification
 
 class CustomerContactSerializer(serializers.ModelSerializer):
     class Meta:
@@ -127,3 +127,21 @@ class MessageTemplateSerializer(serializers.ModelSerializer):
         if value and not value.name.lower().endswith(('.pdf', '.jpg', '.jpeg', '.png', '.docx')):
             raise serializers.ValidationError("Unsupported file type.")
         return value
+
+class RelatedObjectField(serializers.Field):
+    def to_representation(self, value):
+        if value is None:
+            return None
+        
+        return {
+            'type': value.__class__.__name__,
+            'id': str(value.id),
+            'string': str(value)
+        }
+    
+class NotificationSerializer(serializers.ModelSerializer):
+    related_object = RelatedObjectField(read_only=True)
+
+    class Meta:
+        model = Notification
+        fields = ['id', 'user', 'title', 'message', 'type', 'is_read', 'created_at', 'related_object']
