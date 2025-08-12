@@ -47,6 +47,7 @@ GOOGLE_SOCIAL_AUTH_ID = config('GOOGLE_CLIENT_ID')
 INSTALLED_APPS = [
     'jazzmin',
     'rest_framework',
+    'payment.apps.PaymentConfig',
     'user_authentication.apps.UserAuthenticationConfig',
     'user_business.apps.UserBusinessConfig',
     'phonenumber_field',
@@ -76,6 +77,8 @@ INFOBIP_API_KEY = config('INFOBIP_API_KEY')
 INFOBIP_BASE_URL = config('INFOBIP_BASE_URL')
 INFOBIP_SENDER = config('INFOBIP_SENDER')  # Infobip test sender
 
+PAYSTACK_TESTED_PUBLIC_API_KEY = config('PAYSTACK_TESTED_PUBLIC_API_KEY')
+PAYSTACK_TESTED_SECRET_API_KEY = config('PAYSTACK_TESTED_SECRET_API_KEY')
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',

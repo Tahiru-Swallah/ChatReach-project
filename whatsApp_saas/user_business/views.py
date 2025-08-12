@@ -11,6 +11,7 @@ from .models import CustomerContact, ScheduledMessage, TemplateCategory, Message
 from .serializer import CustomerContactSerializer, ScheduledMessageSerializer, MessageTemplateSerializer, TemplateCategorySerializer
 import pandas as pd
 from .utils import send_whatsapp_message
+from .task import create_notification
 
 
 @login_required
@@ -31,7 +32,15 @@ def create_customer_contact(request):
     serializer = CustomerContactSerializer(data=request.data, context={'request': request})
 
     if serializer.is_valid():
-        serializer.save()
+        contact = serializer.save()
+        create_notification.delay(
+            str(request.user.id),
+            'New Contact Added',
+            'success',
+            'user_business',
+            'customercontact',
+            str(contact.id)
+        )
         return Response(serializer.data, status=status.HTTP_200_OK)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -106,6 +115,16 @@ def import_contacts_from_excel(request):
                 created.append(serializer.data)
                 existing_numbers.add(cleaned_number)
 
+                create_notification.delay(
+                    str(request.user.id),
+                    'Contact Imported',
+                    f"contact '{contact_data['name']}' Imported successfully",
+                    'info',
+                    'user_business',
+                    'customercontact',
+                    str(serializer.instance.id)
+                )
+
             except IntegrityError:
                 skip_duplicates.append({'contact_data': row.to_dict(), 'reason': 'Duplicate phone number (caught during save)'})
         else:
@@ -150,7 +169,17 @@ def schedule_message(request):
     serializer = ScheduledMessageSerializer(data=request.data, context={'request': request})
 
     if serializer.is_valid():
-        serializer.save()
+        message = serializer.save()
+
+        create_notification.delay(
+            str(request.user.id),
+            'Message Scheduled',
+            f"Message to be sent on {message.schedule_time} was scheduled",
+            'success',
+            'user_business',
+            'schedulemessage',
+            str(message.id)
+        )
         return Response(serializer.data, status=status.HTTP_200_OK)
     
     print("Serializer Errors:", serializer.errors)
@@ -201,6 +230,7 @@ def create_and_list_template_category(request):
         serializer = TemplateCategorySerializer(data=request.data, context={'request': request})
         if serializer.is_valid():
             serializer.save(user=request.user)
+            
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -216,7 +246,16 @@ def create_list_message_template(request):
     elif request.method == 'POST':
         serializer = MessageTemplateSerializer(data=request.data, context={'request': request})
         if serializer.is_valid():
-            serializer.save(user=request.user)
+            template = serializer.save(user=request.user)
+            create_notification.delay(
+                str(request.user.id),
+                "Template Created",
+                f"Message template '{template.title}' created.",
+                'sucess',
+                'user_business',
+                'messagetemplate',
+                str(template.id)
+            )
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
@@ -263,6 +302,16 @@ def send_template_message(request):
                     message_text=template,
                 )
                 success.append(contact.phone_number)
+
+                create_notification.delay(
+                    str(request.user.id),
+                    'Message Sent',
+                    f"Message sent to {contact.name} ({contact.phone_number})",
+                    'info',
+                    'user_business',
+                    'customercontact',
+                    str(contact.id)
+                )
 
             except Exception as e:
                 failed.append({
