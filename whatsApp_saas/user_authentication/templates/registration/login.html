@@ -1,119 +1,163 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="csrf-token" content="{{ csrf_token }}">
-    <title>Document</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="csrf-token" content="{{ csrf_token }}">
+  <title>ChatReach - Merchant Authentication</title>
+  <!-- Main Auth CSS -->
+  <link rel="stylesheet" href="{% static 'css/auth.css' %}">
+  <!-- FontAwesome / Boxicons for clean modern icons (Optional) -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
-    <form id="loginForm">
-        <input type="text" id="emailOrPhone" name="email_or_phonenumber" placeholder="Email or Phone" required><br>
-        <input type="password" id="password" name="password" placeholder="Password" required><br>
-        <button type="submit">Login</button> 
 
-        <a href="{% url 'user_authentication:register'%}">Sign Up</a>
-    </form>
+  <main class="auth-container">
+    <div class="auth-card">
+      
+      <!-- Brand Header -->
+      <header class="brand-header">
+        <div class="logo-icon">
+          <i class="fa-brands fa-whatsapp"></i>
+        </div>
+        <h1>ChatReach</h1>
+        <p>WhatsApp Commerce & Marketing Platform</p>
+      </header>
 
-    <div id="g_id_signin"></div>
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
+      <!-- Dynamic Feedback Alert (Success / Error) -->
+      <div id="authAlert" class="auth-alert hidden" role="alert">
+        <span id="authAlertIcon" class="alert-icon"></span>
+        <span id="authAlertText" class="alert-text"></span>
+      </div>
 
-    <script>
-        window.onload = function () {
-            google.accounts.id.initialize({
-            client_id: "{{ GOOGLE_AUTH_CLIENT_ID }}",
-            callback: handleCredentialResponse,
-            auto_select: true, // ✅ force show account chooser
-            cancel_on_tap_outside: true,
-            context: 'signin'
-            });
+      <!-- Auth Navigation Tabs -->
+      <nav class="auth-tabs">
+        <button id="tabLogin" class="tab-btn active" type="button">Sign In</button>
+        <button id="tabRegister" class="tab-btn" type="button">Register Business</button>
+      </nav>
 
-            google.accounts.id.renderButton(
-            document.getElementById("g_id_signin"), {
-                theme: "outline",
-                size: "medium",
-                type: "standard",
-                text: "sign_in_with",
-                shape: "rectangular"
-            }
-            );
-            
-            // Optional: trigger popup immediately (like Pinterest)
-            google.accounts.id.prompt();
-        };
+      <!-- ================= LOGIN FORM ================= -->
+      <form id="loginForm" class="auth-form active-form" novalidate>
+        <div class="form-group">
+          <label for="loginEmail">Email or Phone Number</label>
+          <div class="input-wrapper">
+            <i class="fa-regular fa-envelope input-icon"></i>
+            <input 
+              type="email" 
+              id="loginEmail" 
+              name="email" 
+              placeholder="merchant@gmail.com or Phone Number" 
+              required 
+              autocomplete="email"
+            >
+          </div>
+        </div>
 
-        document.getElementById("loginForm").addEventListener('submit', async function(e) {
-            e.preventDefault()
+        <div class="form-group">
+          <div class="label-row">
+            <label for="loginPassword">Password</label>
+            <a href="#" id="forgotPasswordLink" class="forgot-link">Forgot password?</a>
+          </div>
+          <div class="input-wrapper">
+            <i class="fa-solid fa-lock input-icon"></i>
+            <input 
+              type="password" 
+              id="loginPassword" 
+              name="password" 
+              placeholder="••••••••" 
+              required 
+              autocomplete="current-password"
+            >
+            <button type="button" class="toggle-password-btn" aria-label="Toggle password visibility">
+              <i class="fa-regular fa-eye"></i>
+            </button>
+          </div>
+        </div>
 
-            const email_or_phonenumber = document.getElementById("emailOrPhone").value
-            const password = document.getElementById("password").value
+        <button type="submit" id="loginSubmitBtn" class="btn-primary">
+          <span class="btn-text">Sign In</span>
+        </button>
+      </form>
 
-            console.log(email_or_phonenumber)
+      <!-- ================= REGISTRATION FORM ================= -->
+      <form id="registerForm" class="auth-form hidden-form" novalidate>
+        <!-- <div class="form-group">
+          <label for="regBusinessName">Business / Brand Name</label>
+          <div class="input-wrapper">
+            <i class="fa-solid fa-store input-icon"></i>
+            <input 
+              type="text" 
+              id="regBusinessName" 
+              name="business_name" 
+              placeholder="e.g. Maya's Fashion Hub" 
+              required
+            >
+          </div>
+        </div> -->
 
-            try{
-                const response = await fetch('/account/api/login/', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    credentials: 'include',
-                    body: JSON.stringify({email_or_phonenumber, password})
-                })
+        <div class="form-group">
+          <label for="regEmail">Email</label>
+          <div class="input-wrapper">
+            <i class="fa-regular fa-envelope input-icon"></i>
+            <input 
+              type="email" 
+              id="regEmail" 
+              name="email" 
+              placeholder="contact@gmail.com" 
+              required 
+              autocomplete="email"
+            >
+          </div>
+        </div>
 
-                const data = await response.json()
+        <div class="form-group">
+          <label for="regPhone">Phone Number</label>
+          <div class="input-wrapper">
+            <i class="fa-solid fa-mobile input-icon"></i>
+            <input 
+              type="tel" 
+              id="regPhone" 
+              name="phone" 
+              placeholder="+233 24 000 0000" 
+              required 
+              autocomplete="tel"
+            >
+          </div>
+        </div>
 
-                if (response.ok){
-                    localStorage.setItem('access_token', data.access_token)
-                    localStorage.setItem('refresh_token', data.refresh_token)
+        <div class="form-group">
+          <label for="regPassword">Password</label>
+          <div class="input-wrapper">
+            <i class="fa-solid fa-lock input-icon"></i>
+            <input 
+              type="password" 
+              id="regPassword" 
+              name="password" 
+              placeholder="Min. 8 characters" 
+              required 
+              autocomplete="new-password"
+            >
+            <button type="button" class="toggle-password-btn" aria-label="Toggle password visibility">
+              <i class="fa-regular fa-eye"></i>
+            </button>
+          </div>
+        </div>
 
-                    alert('Login Successfully')
+        <button type="submit" id="registerSubmitBtn" class="btn-primary">
+          <span class="btn-text">Create Account</span>
+        </button>
+      </form>
 
-                    window.location.href = '/account/'
+      <!-- Footer Info -->
+      <footer class="auth-footer">
+        <p>By continuing, you agree to ChatReach's <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a>.</p>
+      </footer>
 
-                } else{
-                    alert(data.detail || 'login failed')
-                    throw new Error(response.statusText)
-                }
+    </div>
+  </main>
 
-            } catch(error){
-                console.error(Error)
-            }
-        })
-
-        async function handleCredentialResponse(response){
-            const id_token = response.credential
-
-            try{
-                const response = await fetch('/account/google/', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        "X-CSRFToken": "{{ csrf_token }}"
-                    },
-                    body: JSON.stringify({
-                        provider: 'google',
-                        id_token: id_token
-                    })
-                })
-
-                const data = await response.json()
-
-                if (response.ok && data.access_token){
-                    localStorage.setItem('access_token', data.access_token)
-                    localStorage.setItem('refresh_token', data.refresh_token)
-
-                    alert('Login successful')
-
-                    window.location.href = '/account/'
-
-                } else{
-                    alert(data.detail || 'login failed')
-                }
-
-            } catch(error){
-                console.error(error)
-            }
-        }
-    </script>
+  <!-- JS Scripts -->
+  <script src="{% static 'js/auth.js' %}"></script>
 </body>
 </html>

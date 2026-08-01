@@ -1,60 +1,152 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="csrf-token" content="{{ csrf_token }}">
+  <title>ChatReach - Set Up Your Business Profile</title>
+  
+  <!-- Shared & Onboarding Stylesheets -->
+  <link rel="stylesheet" href="{% static 'css/auth.css' %}">
+  <link rel="stylesheet" href="{% static 'css/onboarding.css' %}">
+  
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
-    <form id="business_profile_form">
-        {% csrf_token %}
-        <input type="text" name="business_name" placeholder="Business Name" required /><br>
-        <input type="text" name="phone_number" placeholder="phone_number"/><br>
-        <input type="email" name="email" placeholder="email"/><br>
-        <input type="text" name="website" placeholder="website"/><br>
-        <input type="text" name="description" placeholder="description"/><br>
-        <input type="text" name="location" placeholder="location"/><br>
-        <button type="submit">Save Business Profile</button>
-    </form>
 
-    <div id="response-message"></div>
+  <main class="onboarding-container">
+    <div class="onboarding-card">
+      
+      <!-- Progress Indicator Header -->
+      <header class="onboarding-header">
+        <div class="step-badge">Step 1 of 1</div>
+        <h1>Set Up Your Business Profile</h1>
+        <p>Configure your business details to complete your workspace setup.</p>
+      </header>
 
+      <!-- Dynamic Feedback Alert -->
+      <div id="onboardingAlert" class="auth-alert hidden" role="alert">
+        <span id="onboardingAlertIcon" class="alert-icon"></span>
+        <span id="onboardingAlertText" class="alert-text"></span>
+      </div>
 
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const form = document.getElementById('business_profile_form');
+      <!-- Onboarding Form -->
+      <form id="businessProfileForm" class="onboarding-form" enctype="multipart/form-data" novalidate>
+        
+        <!-- 1. LOGO UPLOAD (Optional) -->
+        <div class="logo-dropzone" id="logoDropzone">
+          <input type="file" id="businessLogo" name="logo" accept="image/*" class="file-input-hidden">
+          
+          <!-- Image Preview Container (Initially Hidden) -->
+          <div class="logo-preview-wrapper hidden" id="logoPreviewWrapper">
+            <img id="logoImagePreview" src="" alt="Logo Preview" class="logo-preview-img">
+          </div>
 
-            form.addEventListener('submit', async function(e){
-                e.preventDefault()
+          <!-- Placeholder State (Shown when no file is selected) -->
+          <div class="logo-placeholder-box" id="logoPlaceholder">
+            <i class="fa-solid fa-cloud-arrow-up"></i>
+          </div>
 
+          <!-- Label Text -->
+          <div class="dropzone-text">
+            <p class="dropzone-title" id="dropzoneTitle">Click or drag image here</p>
+            <p class="dropzone-sub">PNG, JPG, or WEBP (Max 2MB)</p>
+          </div>
+          
+          <!-- Clear Image Button -->
+          <button type="button" id="removeLogoBtn" class="btn-remove-logo hidden" title="Remove Logo">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
 
-                const formData = new FormData(form);
+        <!-- 2. BUSINESS NAME (Required) -->
+        <div class="form-group">
+          <label for="businessName">Business Name <span class="required-asterisk">*</span></label>
+          <div class="input-wrapper">
+            <i class="fa-solid fa-store input-icon"></i>
+            <input 
+              type="text" 
+              id="businessName" 
+              name="name" 
+              placeholder="e.g. Maya's Fashion Hub" 
+              required
+            >
+          </div>
+        </div>
 
+        <!-- 3. PHONE NUMBER & WEBSITE (Optional Split Row) -->
+        <div class="form-row split-row">
+          <div class="form-group flex-1">
+            <label for="businessPhone">Phone Number <span class="optional-tag">(Optional)</span></label>
+            <div class="input-wrapper">
+              <i class="fa-brands fa-whatsapp input-icon"></i>
+              <input 
+                type="tel" 
+                id="businessPhone" 
+                name="phone_number" 
+                placeholder="+233 24 000 0000"
+              >
+            </div>
+          </div>
 
-                try{
-                    const response = await fetch('/account/api/business/profile/', {
-                        method: 'POST',
-                        headers: {
-                            'X-CSRFToken': document.querySelector('input[name="csrfmiddlewaretoken"]').value
-                        },
-                        body: formData
-                    })
+          <div class="form-group flex-1">
+            <label for="businessWebsite">Website URL <span class="optional-tag">(Optional)</span></label>
+            <div class="input-wrapper">
+              <i class="fa-solid fa-globe input-icon"></i>
+              <input 
+                type="url" 
+                id="businessWebsite" 
+                name="website" 
+                placeholder="https://mayasfashion.com"
+              >
+            </div>
+          </div>
+        </div>
 
-                    const data = await response.json()
+        <!-- 4. COUNTRY & CITY (Required Split Row) -->
+        <div class="form-row split-row">
+          <div class="form-group flex-1">
+            <label for="businessCountry">Country <span class="required-asterisk">*</span></label>
+            <div class="input-wrapper">
+              <i class="fa-solid fa-location-dot input-icon"></i>
+              <input 
+                type="text" 
+                id="businessCountry" 
+                name="country" 
+                value="Ghana" 
+                placeholder="e.g. Ghana" 
+                required
+              >
+            </div>
+          </div>
 
-                    if (response.ok){
-                        document.getElementById("response-message").innerText = "✅ Profile saved successfully!";
-                        console.log("Success:", data);
-                    } else {
-                        document.getElementById("response-message").innerText = "❌ Error: " + JSON.stringify(data);
-                        console.error("Error:", data);
-                    }
+          <div class="form-group flex-1">
+            <label for="businessCity">City <span class="required-asterisk">*</span></label>
+            <div class="input-wrapper">
+              <i class="fa-solid fa-city input-icon"></i>
+              <input 
+                type="text" 
+                id="businessCity" 
+                name="city" 
+                placeholder="e.g. Accra or Kumasi" 
+                required
+              >
+            </div>
+          </div>
+        </div>
 
-                } catch(error){
-                    console.error(error)
-                }
-            })
-        })
-    </script>
+        <!-- Submit Button -->
+        <button type="submit" id="saveBusinessBtn" class="btn-primary">
+          <span class="btn-text">Save & Go to Dashboard</span>
+          <i class="fa-solid fa-arrow-right"></i>
+        </button>
+
+      </form>
+    </div>
+  </main>
+
+  <script src="{% static 'js/onboarding.js' %}"></script>
 </body>
 </html>

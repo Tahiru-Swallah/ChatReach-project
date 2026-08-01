@@ -1,9 +1,13 @@
 from django.urls import path
 from . import views
 
+from user_authentication.views import home
+
 app_name = 'user_business'
 
 urlpatterns = [
+    path('', home, name='home'),
+    
     # CONTACT CREATION AND LISTING API
     path('api/contacts/', views.list_customer_contacts, name='list_customer_contacts'),
     path('api/contacts/create/', views.create_customer_contact, name='create_customer_contact'),

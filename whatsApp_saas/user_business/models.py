@@ -1,5 +1,5 @@
 from django.db import models
-from user_authentication.models import CustomUser, BusinessProfile
+from user_authentication.models import CustomUser, Business
 from uuid import uuid4
 from phonenumber_field.modelfields import PhoneNumberField
 from django.contrib.contenttypes.fields import GenericForeignKey

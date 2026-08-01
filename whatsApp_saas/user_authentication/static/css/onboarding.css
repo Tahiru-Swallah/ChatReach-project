@@ -1,0 +1,239 @@
+/* ==========================================================================
+   ChatReach Business Profile Onboarding Stylesheet
+   ========================================================================== */
+
+/* 1. Onboarding Container & Card Overrides */
+.onboarding-container {
+  width: 100%;
+  max-width: 520px; /* Slightly wider than auth card for side-by-side inputs */
+  margin: auto;
+}
+
+.onboarding-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-card);
+  padding: 36px 32px;
+  box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(8px);
+}
+
+/* 2. Step Badge & Header */
+.onboarding-header {
+  text-align: center;
+  margin-bottom: 28px;
+}
+
+.step-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  background: var(--color-primary-alpha);
+  border: 1px solid var(--border-color-focus);
+  color: var(--color-primary);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-radius: 20px;
+  margin-bottom: 12px;
+}
+
+.onboarding-header h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-main);
+  letter-spacing: -0.02em;
+}
+
+.onboarding-header p {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-top: 6px;
+  line-height: 1.4;
+}
+
+/* 3. Form Layout & Split Rows */
+.onboarding-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.form-row.split-row {
+  display: flex;
+  gap: 16px;
+}
+
+.flex-1 {
+  flex: 1;
+}
+
+/* Indicators */
+.required-asterisk {
+  color: var(--color-primary);
+  font-weight: 700;
+  margin-left: 2px;
+}
+
+.optional-tag {
+  font-size: 0.75rem;
+  color: var(--text-placeholder);
+  font-weight: 400;
+  margin-left: 4px;
+}
+
+/* 4. Interactive Logo Upload Dropzone */
+.logo-upload-group {
+  position: relative;
+}
+
+/* Helper class for hiding elements cleanly */
+.hidden {
+  display: none !important;
+}
+
+/* 4. Interactive Logo Upload Dropzone */
+.logo-upload-group {
+  position: relative;
+}
+
+.logo-dropzone {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 16px;
+  background: var(--bg-input, #111827);
+  border: 2px dashed var(--border-color, #374151);
+  border-radius: var(--radius-input, 10px);
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+}
+
+.logo-dropzone:hover,
+.logo-dropzone.dragover {
+  border-color: #10b981; /* WhatsApp Green */
+  background: rgba(16, 185, 129, 0.05);
+}
+
+.file-input-hidden {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 2;
+}
+
+/* Default Placeholder Box (Icon only for a clean look) */
+.logo-placeholder-box {
+  width: 52px;
+  height: 52px;
+  min-width: 52px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px dashed rgba(255, 255, 255, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #10b981;
+  font-size: 1.25rem;
+}
+
+/* Image Preview Box */
+.logo-preview-wrapper {
+  width: 52px;
+  height: 52px;
+  min-width: 52px;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid #10b981;
+  background: #000;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.logo-preview-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Dropzone Text Styling */
+.dropzone-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1;
+}
+
+.dropzone-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #f9fafb;
+}
+
+.dropzone-sub {
+  font-size: 0.75rem;
+  color: #9ca3af;
+}
+
+/* Remove Button */
+.btn-remove-logo {
+  position: relative;
+  z-index: 3; /* Above hidden input so click reaches it */
+  width: 28px;
+  height: 28px;
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #ef4444;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 0.8rem;
+  transition: all 0.2s ease;
+}
+
+.btn-remove-logo:hover {
+  background: #ef4444;
+  color: #ffffff;
+}
+/* ==========================================================================
+   Responsive & Mobile Optimizations
+   ========================================================================== */
+
+@media screen and (max-width: 520px) {
+  .onboarding-card {
+    padding: 24px 18px;
+    border-radius: 14px;
+  }
+
+  /* Stack horizontal split rows on mobile screens */
+  .form-row.split-row {
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  .logo-dropzone {
+    padding: 14px;
+    gap: 12px;
+  }
+
+  .logo-preview-wrapper {
+    width: 54px;
+    height: 54px;
+    min-width: 54px;
+  }
+
+  .dropzone-title {
+    font-size: 0.825rem;
+  }
+
+  .dropzone-sub {
+    font-size: 0.725rem;
+  }
+}

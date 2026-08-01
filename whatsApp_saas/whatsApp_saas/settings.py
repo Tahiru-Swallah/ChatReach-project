@@ -28,7 +28,11 @@ SECRET_KEY = 'django-insecure-nk$ufq1p0rh^h8*k)^^#@@x1x=$+5$d00+fm9)^1l+l!offzw$
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['chatReach.com', 'localhost', '127.0.0.1']
+ALLOWED_HOSTS = ['chatReach.com', 'localhost', '127.0.0.1', '172.20.10.2', 'yuonne-curatorial-marlena.ngrok-free.dev']
+
+CSRF_TRUSTED_ORIGINS = [
+    "https://yuonne-curatorial-marlena.ngrok-free.dev",
+]
 
 AUTH_USER_MODEL = 'user_authentication.CustomUser'
 
@@ -80,8 +84,17 @@ INFOBIP_SENDER = config('INFOBIP_SENDER')  # Infobip test sender
 PAYSTACK_TESTED_PUBLIC_API_KEY = config('PAYSTACK_TESTED_PUBLIC_API_KEY')
 PAYSTACK_TESTED_SECRET_API_KEY = config('PAYSTACK_TESTED_SECRET_API_KEY')
 
+META_APP_ID = config('META_APP_ID')
+META_APP_SECRET = config('META_APP_SECRET')
+META_CONFIG_ID = config('META_CONFIG_ID')
+GRAPH_API_VERSION = config('GRAPH_API_VERSION')
+WINIMARKET_CATALOG_ID = config('WINIMARKET_CATALOG_ID')
+META_SYSTEM_USER_TOKEN = config('META_SYSTEM_USER_TOKEN')
+DEFAULT_PRODUCT_WEB_URL = config("DEFAULT_PRODUCT_WEB_URL")
+
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whatsApp_saas.middleware.OverrideCOOPMiddleware',  # Add the custom middleware here
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -97,6 +110,9 @@ AUTHENTICATION_BACKENDS = [
     'django.contrib.auth.backends.ModelBackend',  
 ]
 
+
+SITE_URL = "https://yuonne-curatorial-marlena.ngrok-free.dev"
+DEFAULT_PRODUCT_WEB_URL = "https://winimarketgh.shop/product/detail/020ae260-a8ec-4261-924f-9a75d77cff28/iphone-11/"
 ROOT_URLCONF = 'whatsApp_saas.urls'
 
 TEMPLATES = [
