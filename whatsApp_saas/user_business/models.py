@@ -5,24 +5,126 @@ from phonenumber_field.modelfields import PhoneNumberField
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 
+import re
+from django.core.exceptions import ValidationError
+from django.utils.translation import gettext_lazy as _
 
+def validate_e164_phone_number(value):
+    """
+    Validates that the phone number is in international E.164 format (e.g. +233241234567 or 233241234567).
+    """
+    clean_val = value.strip().lstrip('+')
+    if not re.match(r'^\d{10,15}$', clean_val):
+        raise ValidationError(
+            _('%(value)s is not a valid E.164 phone number.'),
+            params={'value': value},
+        )
 class CustomerContact(models.Model):
+    """
+    Stores customer phone numbers, tags, and audience attributes per business tenant.
+    """
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
-    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='customer_contacts')
-    name = models.CharField(max_length=255)
-    phone_number = PhoneNumberField()
+
+    business = models.ForeignKey(Business, on_delete=models.CASCADE, related_name='customer_contacts')
+
+    name = models.CharField(max_length=255, blank=True, null=True, help_text=_("Contact full name or display label"))
+
+    phone_number = PhoneNumberField(db_index=True, help_text="Enter phone number in E.164 format (e.g. +233241234567 or 233241234567)")
+
     email = models.EmailField(blank=True, null=True)
-    tag = models.CharField(max_length=100, blank=True, null=True)  # for grouping contacts
+
+    tag = models.JSONField(
+        default=list, 
+        blank=True, 
+        help_text=_("List of audience tags e.g. ['VIP', 'Youth Group', 'Donors', 'Wholesale']")
+    )
+
+    # Enterprise & Meta Compliance
+    is_opted_in = models.BooleanField(
+        default=True, 
+        db_index=True, 
+        help_text=_("Explicit consent flag for Meta policy & Ghana Data Protection compliance")
+    )
+
+    # Custom Metadata (Dynamic Fields like location, total spent, last purchase date)
+    attributes = models.JSONField(
+        default=dict, 
+        blank=True, 
+        help_text=_("Key-value pair custom attributes for template variable interpolation e.g. {'city': 'Kumasi'}")
+    )
+
     created_on = models.DateTimeField(auto_now_add=True)
+
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        unique_together = ('user', 'phone_number')  # prevent duplicates for same user
         ordering = ['-created_on']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['business', 'phone_number'], 
+                name='unique_phone_per_business'
+            )
+        ]
 
     def __str__(self):
-        return f"{self.name} ({self.phone_number})"
+        return f"{self.name or 'Unnamed'} ({self.phone_number})"
+
+class WhatsAppTemplate(models.Model):
+    class Category(models.TextChoices):
+        MARKETING = 'MARKETING', 'Marketing'
+        UTILITY = 'UTILITY', 'Utility'
+        AUTHENTICATION = 'AUTHENTICATION', 'Authentication'
+
+    class Status(models.TextChoices):
+        DRAFT = 'DRAFT', 'Draft'
+        PENDING = 'PENDING', 'Pending Approval'
+        APPROVED = 'APPROVED', 'Approved'
+        REJECTED = 'REJECTED', 'Rejected'
+        PAUSED = 'PAUSED', 'Paused'
+        DISABLED = 'DISABLED', 'Disabled'
+
+    class Language(models.TextChoices):
+        ENGLISH_US = 'en_US', 'English (US)'
+        ENGLISH_UK = 'en_GB', 'English (UK)'
+        FRENCH = 'fr', 'French'
+        SPANISH = 'es', 'Spanish'
+
+    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
+    business = models.ForeignKey(
+        Business, # Adjust model reference if needed
+        on_delete=models.CASCADE,
+        related_name='whatsapp_templates'
+    )
     
+    name = models.CharField(
+        max_length=512, 
+        help_text="Lowercase template identifier required by Meta (e.g. order_update_v1)"
+    )
+    category = models.CharField(max_length=32, choices=Category.choices, default=Category.UTILITY)
+    language = models.CharField(max_length=10, choices=Language.choices, default=Language.ENGLISH_US)
+    status = models.CharField(max_length=32, choices=Status.choices, default=Status.DRAFT)
+    
+    # Template Structure
+    body_text = models.TextField(help_text="Body content with optional variables like {{1}}, {{2}}")
+    header_type = models.CharField(max_length=20, default='NONE', choices=[
+        ('NONE', 'None'), ('TEXT', 'Text'), ('IMAGE', 'Image'), ('DOCUMENT', 'Document')
+    ])
+    header_text = models.CharField(max_length=60, blank=True, null=True)
+    footer_text = models.CharField(max_length=60, blank=True, null=True)
+    
+    # Meta Graph Identifiers
+    meta_template_id = models.CharField(max_length=128, blank=True, null=True)
+    rejection_reason = models.TextField(blank=True, null=True)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('business', 'name', 'language')
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.name} ({self.language}) - {self.status}"    
 
 class ScheduledMessage(models.Model):
     STATUS_CHOICES = [

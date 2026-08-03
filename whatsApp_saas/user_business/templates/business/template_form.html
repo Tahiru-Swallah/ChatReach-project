@@ -2,192 +2,444 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="csrf-token" content="{{ csrf_token }}">
-    <title>Document</title>
+    <title>WhatsApp Templates | ChatReach</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f8fafc; margin: 0; padding: 24px; color: #1a202c; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .btn-primary { background: #075e54; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-weight: 600; }
+        .btn-secondary { background: #e2e8f0; color: #2d3748; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-weight: 600; }
+        
+        table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        th, td { padding: 12px 16px; text-align: left; border-bottom: 1px solid #e2e8f0; font-size: 14px; }
+        th { background: #edf2f7; font-weight: 600; }
+
+        .badge { padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: bold; display: inline-block; }
+        .status-APPROVED { background: #c6f6d5; color: #22543d; }
+        .status-PENDING { background: #feebc8; color: #744210; }
+        .status-REJECTED { background: #fed7d7; color: #742a2a; }
+        .status-DRAFT { background: #e2e8f0; color: #4a5568; }
+
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: none; justify-content: center; align-items: center; z-index: 1000; }
+        .modal-body { background: white; padding: 24px; border-radius: 8px; width: 500px; max-width: 90%; }
+        .form-group { margin-bottom: 14px; }
+        .form-group label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 8px; border: 1px solid #cbd5e0; border-radius: 4px; box-sizing: border-box; }
+    </style>
 </head>
 <body>
-    <form id="category-form">
-        <select id="category_name" required>
-            <option value="">Select category</option>
-            <option value="marketing">Marketing</option>
-            <option value="reminder">Reminder</option>
-            <option value="update">Update</option>
-            <option value="support">Support</option>
-            <option value="custom">Custom</option>
-        </select> <br>
-        <button type="submit">Add Category</button>
-    </form>
 
-    <ul id="category-list"></ul>
+<div class="header">
+    <h2>WhatsApp Message Templates</h2>
+    <div style="display: flex; gap: 8px;">
+        <button class="btn-secondary" onclick="syncTemplatesWithMeta()">🔄 Sync with Meta</button>
+        <button class="btn-primary" onclick="openCreateModal()">+ Create Template</button>
+        <!-- ADDED CAMPAIGN BUTTON HERE -->
+        <button class="btn-primary" style="background: #25D366;" onclick="openCampaignModal()">🚀 Launch Campaign</button>
+    </div>
+</div>
 
-    <form id="template_form" enctype="multipart/form-data">
-        <input type="text" id="title" placeholder="Template title" required><br>
-        <input type="text" id="template_name" placeholder="Template Name" required><br>
-        <input type="text" id="language" value="en" required><br>
-        <select id="category_id" required><br>
-            <option value="">Select Catgory</option>
-        </select>
-        <input type="file" id="attachment"><br>
-        <input type="url" id="external_url" placeholder="External Link"><br>
-        <textarea id="placeholder" placeholder="[{name: value}] JSON format"></textarea><br>
-        <label for="">
-            <input type="checkbox" id="is_favorite"> Favorite
-        </label><br>
-        <button type="submit">Create Template</button>
-    </form>
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Category</th>
+            <th>Language</th>
+            <th>Status</th>
+            <th>Header</th>
+            <th>Body Preview</th>
+        </tr>
+    </thead>
+    <tbody id="templateTableBody">
+        <tr><td colspan="6" style="text-align: center;">Loading templates...</td></tr>
+    </tbody>
+</table>
 
-    <ul id="template-list"></ul>
+<!-- Create Template Modal -->
+<div class="modal-overlay" id="createTemplateModal">
+    <div class="modal-body">
+        <h3 style="margin-top:0;">Create New WhatsApp Template</h3>
+        <form id="templateForm">
+            <div class="form-group">
+                <label>Template Identifier Name (lowercase & underscores only)</label>
+                <input type="text" id="tplName" placeholder="e.g. order_confirmation_v1" required>
+            </div>
+            
+            <div style="display: flex; gap: 10px;">
+                <div class="form-group" style="flex: 1;">
+                    <label>Category</label>
+                    <select id="tplCategory">
+                        <option value="UTILITY">Utility</option>
+                        <option value="MARKETING">Marketing</option>
+                        <option value="AUTHENTICATION">Authentication</option>
+                    </select>
+                </div>
+                <div class="form-group" style="flex: 1;">
+                    <label>Language</label>
+                    <select id="tplLanguage">
+                        <option value="en_US">English (US)</option>
+                        <option value="en_GB">English (UK)</option>
+                        <option value="fr">French</option>
+                        <option value="es">Spanish</option>
+                    </select>
+                </div>
+            </div>
 
-    <script>
-        
-        async function loadCategories(){
-            try{
-                const response = await fetch('/api/category/create/')
+            <div class="form-group">
+                <label>Header Type (Optional)</label>
+                <select id="tplHeaderType">
+                    <option value="NONE">None</option>
+                    <option value="TEXT">Text</option>
+                    <option value="IMAGE">Image</option>
+                </select>
+            </div>
 
-                if (response.ok){
-                    const categories = await response.json()
-                    const list = document.getElementById('category-list')
-                    list.innerHTML = ''
+            <div class="form-group" id="headerTextGroup" style="display:none;">
+                <label>Header Text</label>
+                <input type="text" id="tplHeaderText" placeholder="e.g. Special Offer!">
+            </div>
 
-                    categories.forEach(cat => { 
-                        const li = document.createElement('li')
-                        li.textContent = `
-                            ${cat.name.charAt(0).toUpperCase() + cat.name.slice(1)} (created: ${new Date(cat.created_at).toLocaleString()})
-                        `
-                        list.appendChild(li)
-                    })
+            <div class="form-group">
+                <label>Message Body * (Use {{1}}, {{2}} for variables)</label>
+                <textarea id="tplBodyText" rows="4" placeholder="Hello {{1}}, your order #{{2}} is confirmed." required></textarea>
+            </div>
 
-                    /* Categories for sselecting template */
-                    const select = document.getElementById('category_id')
-                    categories.forEach(cat => {
-                        const option = document.createElement('option')
-                        option.value = cat.id
-                        option.textContent = cat.name.charAt(0).toUpperCase() + cat.name.slice(1)
+            <div class="form-group">
+                <label>Footer Text (Optional)</label>
+                <input type="text" id="tplFooterText" placeholder="e.g. Reply STOP to unsubscribe">
+            </div>
 
-                        select.appendChild(option)
-                    })
+            <div id="modalStatus" style="font-size:12px; margin-bottom:10px;"></div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 8px;">
+                <button type="button" class="btn-secondary" onclick="closeCreateModal()">Cancel</button>
+                <button type="submit" class="btn-primary" id="submitBtn">Submit to Meta</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Campaign Modal (MOVED OUTSIDE Create Template Modal) -->
+<div class="modal-overlay" id="campaignModal">
+    <div class="modal-body" style="width: 550px; max-width: 95%;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+            <h3 style="margin:0;">🚀 Send Template Campaign</h3>
+            <button onclick="closeCampaignModal()" style="background:none; border:none; font-size:18px; cursor:pointer;">✕</button>
+        </div>
+
+        <form id="campaignForm">
+            <!-- 1. Select Approved Template -->
+            <div class="form-group">
+                <label>Select Approved Template</label>
+                <select id="campaignTemplateSelect" onchange="onTemplateSelectionChange()" required>
+                    <option value="">-- Choose an Approved Template --</option>
+                </select>
+            </div>
+
+            <!-- Template Body Preview Box -->
+            <div id="templatePreviewBox" style="display:none; background:#f7fafc; border:1px solid #e2e8f0; padding:12px; border-radius:6px; font-size:13px; margin-bottom:14px; white-space:pre-wrap;">
+            </div>
+
+            <!-- 2. Dynamic Variable Inputs Container -->
+            <div id="dynamicParamsSection" style="display:none; margin-bottom:14px; background:#f0fff4; border:1px solid #c6f6d5; padding:12px; border-radius:6px;">
+                <label style="color:#22543d; font-weight:bold; display:block; margin-bottom:8px;">Dynamic Variables</label>
+                <div id="dynamicParamsInputs"></div>
+            </div>
+
+            <!-- 3. Target Contacts Selection -->
+            <div class="form-group">
+                <label>Target Recipients</label>
+                <select id="contactTargetType" onchange="toggleContactSelection()" required>
+                    <option value="ALL">All Opted-in Contacts</option>
+                    <option value="CUSTOM">Select Specific Contacts</option>
+                </select>
+            </div>
+
+            <div id="customContactsListGroup" style="display:none; max-height:150px; overflow-y:auto; border:1px solid #cbd5e0; padding:8px; border-radius:4px; margin-bottom:14px;">
+                <!-- Populated dynamically via JS -->
+            </div>
+
+            <div id="campaignStatusMsg" style="font-size:12px; margin-bottom:12px;"></div>
+
+            <!-- Action Buttons -->
+            <div style="display:flex; justify-content:flex-end; gap:8px;">
+                <button type="button" class="btn-secondary" onclick="closeCampaignModal()">Cancel</button>
+                <button type="submit" class="btn-primary" id="dispatchBtn">Send Campaign Now</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    document.getElementById('tplHeaderType').addEventListener('change', function() {
+        document.getElementById('headerTextGroup').style.display = (this.value === 'TEXT') ? 'block' : 'none';
+    });
+
+    function openCreateModal() { document.getElementById('createTemplateModal').style.display = 'flex'; }
+    function closeCreateModal() { document.getElementById('createTemplateModal').style.display = 'none'; }
+
+    async function fetchTemplates() {
+        try {
+            const res = await fetch('/api/templates/');
+            const data = await res.json();
+            const tbody = document.getElementById('templateTableBody');
+            
+            if (data.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;">No templates found. Click "+ Create Template" to get started.</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = data.map(tpl => `
+                <tr>
+                    <td><strong>${tpl.name}</strong></td>
+                    <td>${tpl.category}</td>
+                    <td>${tpl.language}</td>
+                    <td><span class="badge status-${tpl.status}">${tpl.status}</span></td>
+                    <td>${tpl.header_type !== 'NONE' ? tpl.header_type : '—'}</td>
+                    <td style="max-width: 250px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${tpl.body_text}</td>
+                </tr>
+            `).join('');
+        } catch (e) {
+            console.error("Fetch error:", e);
+        }
+    }
+
+    async function syncTemplatesWithMeta() {
+        try {
+            const res = await fetch('/api/templates/sync-status/', {
+                method: 'POST',
+                headers: { 'X-CSRFToken': getCookie('csrftoken') }
+            });
+            const data = await res.json();
+            alert(data.detail || "Sync process completed.");
+            fetchTemplates();
+        } catch (e) {
+            alert("Error syncing templates.");
+        }
+    }
+
+    document.getElementById('templateForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const submitBtn = document.getElementById('submitBtn');
+        const statusDiv = document.getElementById('modalStatus');
+
+        submitBtn.disabled = true;
+        statusDiv.innerText = "Submitting to Meta...";
+
+        const payload = {
+            name: document.getElementById('tplName').value,
+            category: document.getElementById('tplCategory').value,
+            language: document.getElementById('tplLanguage').value,
+            header_type: document.getElementById('tplHeaderType').value,
+            header_text: document.getElementById('tplHeaderText').value,
+            body_text: document.getElementById('tplBodyText').value,
+            footer_text: document.getElementById('tplFooterText').value,
+            submit_to_meta: true
+        };
+
+        try {
+            const res = await fetch('/api/templates/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify(payload)
+            });
+
+            const data = await res.json();
+            if (res.ok) {
+                statusDiv.innerText = "Submitted...";
+                closeCreateModal();
+                fetchTemplates();
+            } else {
+                statusDiv.innerText = `❌ Error: ${data.detail || 'Failed to submit template'}`;
+            }
+        } catch (err) {
+            statusDiv.innerText = "❌ Network error.";
+        } finally {
+            submitBtn.disabled = false;
+        }
+    });
+
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
                 }
-            } catch(error){
-                console.log(error)
             }
         }
+        return cookieValue;
+    }
 
-        document.getElementById('category-form').addEventListener('submit', async (e) => {
-            e.preventDefault();
+    fetchTemplates();
 
-            const name = document.getElementById('category_name').value
+    let availableTemplates = [];
+    let availableContacts = [];
 
-            try{
-                const response = await fetch('/api/category/create/', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
-                    },
-                    body: JSON.stringify({name: name})
-                })
+    // 1. Fetch Approved Templates and Contacts on page load
+    async function loadCampaignData() {
+        try {
+            // Fetch Templates
+            const tplRes = await fetch('/api/templates/');
+            const tplData = await tplRes.json();
+            availableTemplates = tplData.filter(t => t.status === 'APPROVED');
 
-                if(response.ok){
-                    alert('category created')
-                } else{
-                    const errorData= await response.json()
-                    alert('Error creating category:', errorData)
-                }
-            } catch(error){
-                console.error(error);
-            }
-        })
+            // Fetch Contacts
+            const contactRes = await fetch('/api/contacts/');
+            const contactData = await contactRes.json();
+            availableContacts = Array.isArray(contactData) ? contactData : (contactData.results || []);
+        } catch (e) {
+            console.error("Error loading campaign setup data:", e);
+        }
+    }
 
-        document.getElementById('template_form').addEventListener('submit', async (e) => {
-            e.preventDefault();
+    // 2. Open Campaign Modal
+    async function openCampaignModal() {
+        await loadCampaignData();
 
-            const formData = new FormData()
+        const select = document.getElementById('campaignTemplateSelect');
+        select.innerHTML = '<option value="">-- Choose an Approved Template --</option>';
 
-            formData.append('title', document.getElementById('title').value)
-            formData.append('template_name', document.getElementById('template_name').value)
-            formData.append('language', document.getElementById('language').value || 'en')
-            formData.append('category', document.getElementById('category_id').value)
-            formData.append('external_link', document.getElementById('external_url').value);
-            formData.append('is_favorite', document.getElementById('is_favorite').checked);
-
-            const placeholderField = document.getElementById('placeholder')
-            if (placeholderField && placeholderField.value.trim() !== ''){
-                try{
-                    const parse = JSON.parse(placeholderField.value)
-                    formData.append('placeholders', JSON.stringify(parse))
-                } catch(error){
-                    console.error(error)
-                    alert('Invalid Json Parser in the placeholder field')
-                    return;
-                }
-            }
-
-            const attachment = document.getElementById('attachment').files[0]
-            if (attachment){
-                formData.append('attachment', attachment)
-            }
-
-            for(let [key, value] of formData.entries()){
-                console.log(`${key}:`, value)
-            }
-
-            try{
-                const response = await fetch('/api/message/template/create/', {
-                    method: 'POST',
-                    headers: {
-                        'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-                    },
-                    body: formData
-                })
-
-                const data = await response.json()
-                if(response.ok){
-                    alert('Message template created successfully!')
-                    document.getElementById('template_form').reset()
-                    loadTemplate()
-                } else{ 
-                    console.log('error', data)
-                    alert('failed to create template')
-                }
-
-            } catch(error){
-                console.error(error)
-            }
-        })
-
-        async function loadTemplate(){
-            try{
-                const response = await fetch('/api/message/template/create/')
-
-                if(response.ok){
-
-                    const templates = await response.json()
-                    const list = document.getElementById('template-list')
-                    list.innerHTML = ''
-                    console.log(templates)
-
-                    templates.forEach(template => {
-                        const li = document.createElement('li')
-                        li.textContent = `${template.title} (${template.template_name}) - ${template.category_detail?.name || 'No Category'} - ${new Date(template.created_at).toLocaleString()}`;
-
-                        list.appendChild(li)
-                    })
-
-                } else{
-                    const errorData = await response.json()
-                    console.log(errorData)
-                    alert('Template load failed')
-                }
-            } catch(error){
-                console.error(error)
-            }
+        if (availableTemplates.length === 0) {
+            alert("No APPROVED templates available to send yet. Please wait for Meta approval or sync statuses.");
+            return;
         }
 
-        window.onload = () => {
-            loadCategories()
-            loadTemplate()
+        availableTemplates.forEach(tpl => {
+            select.innerHTML += `<option value="${tpl.id}">${tpl.name} (${tpl.language})</option>`;
+        });
+
+        // Populate contacts checkbox list
+        const contactsContainer = document.getElementById('customContactsListGroup');
+        contactsContainer.innerHTML = availableContacts.map(c => `
+            <label style="display:block; font-size:13px; margin-bottom:4px;">
+                <input type="checkbox" class="campaign-contact-checkbox" value="${c.id}"> ${c.first_name || ''} ${c.last_name || ''} (${c.phone_number})
+            </label>
+        `).join('');
+
+        document.getElementById('campaignModal').style.display = 'flex';
+    }
+
+    function closeCampaignModal() {
+        document.getElementById('campaignModal').style.display = 'none';
+    }
+
+    // 3. Handle Template Selection Change & Parse {{1}}, {{2}}
+    function onTemplateSelectionChange() {
+        const tplId = document.getElementById('campaignTemplateSelect').value;
+        const previewBox = document.getElementById('templatePreviewBox');
+        const paramsSection = document.getElementById('dynamicParamsSection');
+        const paramsInputs = document.getElementById('dynamicParamsInputs');
+
+        if (!tplId) {
+            previewBox.style.display = 'none';
+            paramsSection.style.display = 'none';
+            return;
         }
-    </script>
+
+        const selectedTpl = availableTemplates.find(t => t.id === tplId);
+        if (!selectedTpl) return;
+
+        // Show text preview
+        previewBox.innerText = `Preview:\n${selectedTpl.body_text}`;
+        previewBox.style.display = 'block';
+
+        // Extract dynamic variables using Regex like {{1}}, {{2}}
+        const matches = selectedTpl.body_text.match(/\{\{\d+\}\}/g) || [];
+        const uniqueVars = [...new Set(matches)]; // Unique placeholder tokens
+
+        if (uniqueVars.length > 0) {
+            paramsInputs.innerHTML = uniqueVars.map((token, idx) => `
+                <div class="form-group" style="margin-bottom:8px;">
+                    <label style="font-size:12px;">Value for <strong>${token}</strong>:</label>
+                    <input type="text" class="template-variable-input" data-index="${idx}" placeholder="e.g. Value for ${token}" required>
+                </div>
+            `).join('');
+            paramsSection.style.display = 'block';
+        } else {
+            paramsInputs.innerHTML = '';
+            paramsSection.style.display = 'none';
+        }
+    }
+
+    function toggleContactSelection() {
+        const targetType = document.getElementById('contactTargetType').value;
+        document.getElementById('customContactsListGroup').style.display = (targetType === 'CUSTOM') ? 'block' : 'none';
+    }
+
+    // 4. Handle Campaign Form Submit
+    document.getElementById('campaignForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        const dispatchBtn = document.getElementById('dispatchBtn');
+        const statusMsg = document.getElementById('campaignStatusMsg');
+        const tplId = document.getElementById('campaignTemplateSelect').value;
+
+        // Extract Dynamic Variable Values in sequence
+        const varInputs = document.querySelectorAll('.template-variable-input');
+        const parameters = Array.from(varInputs).map(input => input.value.trim());
+
+        // Extract Contact IDs
+        let selectedContactIds = [];
+        const targetType = document.getElementById('contactTargetType').value;
+
+        if (targetType === 'ALL') {
+            selectedContactIds = availableContacts.map(c => c.id);
+        } else {
+            const checkedBoxes = document.querySelectorAll('.campaign-contact-checkbox:checked');
+            selectedContactIds = Array.from(checkedBoxes).map(cb => cb.value);
+        }
+
+        if (selectedContactIds.length === 0) {
+            alert("Please select at least one contact to receive the template campaign.");
+            return;
+        }
+
+        dispatchBtn.disabled = true;
+        statusMsg.innerText = "⏳ Dispatching campaign messages to Meta...";
+        statusMsg.style.color = "#d69e2e";
+
+        const payload = {
+            template_id: tplId,
+            contact_ids: selectedContactIds,
+            parameters: parameters
+        };
+
+        try {
+            const res = await fetch('/api/send-template-campaign/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify(payload)
+            });
+
+            const data = await res.json();
+
+            if (res.ok) {
+                statusMsg.style.color = "#38a169";
+                statusMsg.innerText = `✅ ${data.detail}`;
+                setTimeout(() => {
+                    closeCampaignModal();
+                    statusMsg.innerText = '';
+                }, 2000);
+            } else {
+                statusMsg.style.color = "#e53e3e";
+                statusMsg.innerText = `❌ Error: ${data.detail || 'Dispatch failed'}`;
+            }
+        } catch (err) {
+            statusMsg.style.color = "#e53e3e";
+            statusMsg.innerText = "❌ Network error dispatching campaign.";
+        } finally {
+            dispatchBtn.disabled = false;
+        }
+    });
+</script>
 </body>
 </html>

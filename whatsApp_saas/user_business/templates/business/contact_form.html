@@ -3,114 +3,695 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+    <title>Customer Contacts - ChatReach</title>
+    <style>
+        * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        body { background-color: #f4f6f9; margin: 0; padding: 24px; color: #333; }
+        .container { max-width: 1100px; margin: 0 auto; }
+        
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+        .header h1 { margin: 0; font-size: 24px; }
+        
+        .card { background: #ffffff; border-radius: 8px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); margin-bottom: 20px; }
+        
+        /* Grid Layout for Forms and Controls */
+        .controls-grid { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+        .action-bar { display: flex; gap: 12px; justify-content: flex-end; }
+        
+        input, select, button { padding: 10px 14px; border-radius: 6px; border: 1px solid #dcdfe6; font-size: 14px; }
+        input:focus, select:focus { outline: none; border-color: #25d366; }
+        
+        button { cursor: pointer; border: none; font-weight: 600; transition: background 0.2s; }
+        .btn-primary { background-color: #25d366; color: #fff; }
+        .btn-primary:hover { background-color: #1eb956; }
+        .btn-secondary { background-color: #4a5568; color: #fff; }
+        .btn-secondary:hover { background-color: #2d3748; }
+        .btn-danger { background-color: #e53e3e; color: #fff; padding: 6px 10px; font-size: 12px; }
+        
+        /* Contact Table */
+        table { width: 100%; border-collapse: collapse; text-align: left; }
+        th, td { padding: 12px; border-bottom: 1px solid #edf2f7; }
+        th { background-color: #f7fafc; font-weight: 600; color: #4a5568; }
+        tr:hover { background-color: #fcfcfc; }
+        
+        .badge { display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 11px; background: #e2e8f0; color: #4a5568; margin-right: 4px; }
+        .status-opted-in { color: #2e7d32; background: #e8f5e9; font-weight: 600; }
+        .status-opted-out { color: #c62828; background: #ffebee; font-weight: 600; }
+
+        /* File Upload Panel & Modal */
+        .upload-panel { border: 2px dashed #cbd5e0; padding: 16px; text-align: center; border-radius: 8px; background: #fafafa; margin-bottom: 20px; }
+        .upload-panel input[type="file"] { display: none; }
+        .file-label { cursor: pointer; color: #3182ce; font-weight: 600; }
+        
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 1000; }
+        .modal-body { background: #fff; padding: 24px; border-radius: 8px; width: 100%; max-width: 480px; }
+        .modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+        
+        #statusMessage { margin-top: 10px; font-size: 14px; }
+    </style>
 </head>
 <body>
-    <form id="customer_contact_form">
-        {% csrf_token %}
-        <input type="text" name="name" placeholder="Full Name" required /><br>
-        <input type="tel" name="phone_number" placeholder="Phone Number (e.g., +233...)" required /><br>
-        <input type="email" name="email" placeholder="Email (optional)" /><br>
-        <input type="text" name="tag" placeholder="Tag (optional)" /><br>
-        <button type="submit">Save Contact</button>
-    </form>
 
-    <form id="excel-upload-form">
-        {% csrf_token %}
-        <input type="file" name="file" accept=".xlsx" required />
-        <button type="submit">Upload Contacts</button>
-    </form>
+<div class="container">
+    <div class="header">
+        <div>
+            <h1>Customer Contacts Asset Manager</h1>
+            <p style="margin: 4px 0 0 0; color: #718096; font-size: 14px;">Organize audience lists and customer metadata for ChatReach broadcasts.</p>
+        </div>
+        <div class="action-bar">
+            <button class="btn-secondary" onclick="openSendMessageModal()" style="background-color: #128c7e; color: #fff;">
+                💬 Send Direct Message (<span id="selectedMsgCount">0</span>)
+            </button>
+            <button class="btn-secondary" onclick="openSendCatalogModal()" id="sendCatalogBtn" style="background-color: #075e54;">
+                🛍️ Send Catalog (<span id="selectedCount">0</span>)
+            </button>
+            <button class="btn-primary" onclick="openAddModal()">+ Add Single Contact</button>
+        </div>
+    </div>
 
-    <div id="upload-status"></div>
+    <!-- Bulk Spreadsheet Upload Box -->
+    <div class="card">
+        <h3 style="margin-top: 0; font-size: 16px;">Bulk Import Spreadsheet</h3>
+        <div class="upload-panel">
+            <form id="fileUploadForm">
+                <label for="contactSpreadsheet" class="file-label">Click to select CSV or Excel (.xlsx) file</label>
+                <input type="file" id="contactSpreadsheet" accept=".csv, .xlsx, .xls" onchange="updateFileNameDisplay()">
+                <span id="fileNameDisplay" style="margin-left: 10px; font-size: 13px; color: #4a5568;"></span>
+                <div style="margin-top: 12px;">
+                    <button type="submit" id="uploadBtn" class="btn-secondary">Upload & Process Contacts</button>
+                </div>
+            </form>
+            <div id="uploadStatusMessage"></div>
+        </div>
+    </div>
 
-    <div id="contact-response"></div>
+    <!-- Contact List Table & Search Filter -->
+    <div class="card">
+        <div class="controls-grid">
+            <input type="text" id="searchInput" placeholder="Search by name, phone (+233...), or email..." onkeyup="debounceSearch()">
+            <input type="text" id="tagFilterInput" placeholder="Filter by Tag (e.g. VIP)" onkeyup="debounceSearch()">
+            <select id="optInFilter" onchange="fetchContacts()">
+                <option value="">All Consent States</option>
+                <option value="true">Opted In Only</option>
+                <option value="false">Opted Out</option>
+            </select>
+        </div>
 
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const form = document.getElementById('customer_contact_form');
-            const form2 = document.getElementById('excel-upload-form')
+        <div style="overflow-x: auto;">
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 40px;"><input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll(this)"></th>
+                        <th>Name</th>
+                        <th>Phone Number</th>
+                        <th>Email</th>
+                        <th>Tags</th>
+                        <th>Opt-In Consent</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="contactsTableBody">
+                    <tr><td colspan="6" style="text-align: center;">Loading contacts...</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <div id="tableSummary" style="margin-top: 14px; font-size: 13px; color: #718096;"></div>
+    </div>
+</div>
 
-            form.addEventListener('submit', async (e) => {
-                e.preventDefault();
+<!-- Add Contact Modal -->
+<div class="modal-overlay" id="addContactModal">
+    <div class="modal-body">
+        <h3 style="margin-top: 0;">Add Customer Contact</h3>
+        <form id="addContactForm">
+            <div style="margin-bottom: 12px;">
+                <label style="display: block; margin-bottom: 4px; font-size: 13px;">Phone Number (E.164 format)*</label>
+                <input type="text" id="addPhone" placeholder="e.g. 233241234567" required style="width: 100%;">
+                <small style="color: #718096;">Include country code (e.g., 233 for Ghana)</small>
+            </div>
+            <div style="margin-bottom: 12px;">
+                <label style="display: block; margin-bottom: 4px; font-size: 13px;">Full Name</label>
+                <input type="text" id="addName" placeholder="e.g. Ama Mensah" style="width: 100%;">
+            </div>
+            <div style="margin-bottom: 12px;">
+                <label style="display: block; margin-bottom: 4px; font-size: 13px;">Email Address</label>
+                <input type="email" id="addEmail" placeholder="e.g. ama@example.com" style="width: 100%;">
+            </div>
+            <div style="margin-bottom: 12px;">
+                <label style="display: block; margin-bottom: 4px; font-size: 13px;">Tags (comma-separated)</label>
+                <input type="text" id="addTags" placeholder="e.g. VIP, Kumasi, Retail" style="width: 100%;">
+            </div>
+            <div id="modalFormError" style="color: #e53e3e; font-size: 13px; margin-top: 6px;"></div>
+            <div class="modal-footer">
+                <button type="button" onclick="closeAddModal()" style="background: #e2e8f0; color: #4a5568;">Cancel</button>
+                <button type="submit" class="btn-primary">Save Contact</button>
+            </div>
+        </form>
+    </div>
+</div>
 
-                const formData = new FormData(form)
-                const contactData = {
-                    name: formData.get("name"),
-                    phone_number: formData.get("phone_number"),
-                    email: formData.get("email"),
-                    tag: formData.get("tag")
+<!-- Send Catalog Modal -->
+<div class="modal-overlay" id="sendCatalogModal">
+    <div class="modal-body">
+        <h3 style="margin-top: 0;">Send WhatsApp Catalog</h3>
+        <p style="font-size: 13px; color: #4a5568;">
+            Dispatch interactive catalog items directly to selected customer contacts.
+        </p>
+        
+        <form id="sendCatalogForm">
+            <div style="margin-bottom: 14px;">
+                <label style="display: block; margin-bottom: 4px; font-size: 13px; font-weight: 600;">
+                    Recipients Selected
+                </label>
+                <div id="selectedRecipientsList" style="max-height: 80px; overflow-y: auto; background: #f7fafc; padding: 8px; border-radius: 6px; font-size: 12px;">
+                    <!-- Populated dynamically via JS -->
+                </div>
+            </div>
+
+            <div style="margin-bottom: 14px;">
+                <label style="display: block; margin-bottom: 4px; font-size: 13px; font-weight: 600;">
+                    Catalog Selection
+                </label>
+                <select id="catalogProductScope" style="width: 100%;">
+                    <option value="all">Send All Meta-Synced Products (Up to 30)</option>
+                    <!-- Expandable for specific product UUID selection -->
+                </select>
+                <small style="color: #718096; display: block; margin-top: 4px;">
+                    Meta Cloud API sends an interactive product list containing up to 30 items.
+                </small>
+            </div>
+
+            <div id="catalogModalStatus" style="font-size: 13px; margin-top: 8px;"></div>
+
+            <div class="modal-footer">
+                <button type="button" onclick="closeSendCatalogModal()" style="background: #e2e8f0; color: #4a5568;">Cancel</button>
+                <button type="submit" id="submitCatalogBtn" class="btn-primary" style="background-color: #075e54;">
+                    Dispatch Catalog
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Send Direct Message / Campaign Modal -->
+<div class="modal-overlay" id="sendMessageModal" style="display: none;">
+    <div class="modal-body">
+        <h3 style="margin-top: 0;">Send Direct WhatsApp Message</h3>
+        <p style="font-size: 13px; color: #4a5568;">
+            Send direct messages or images to selected contacts.
+        </p>
+
+        <form id="sendMessageForm" enctype="multipart/form-data">
+            <div style="margin-bottom: 12px;">
+                <label style="display: block; margin-bottom: 4px; font-size: 13px; font-weight: 600;">Recipients</label>
+                <div id="msgSelectedRecipients" style="max-height: 70px; overflow-y: auto; background: #f7fafc; padding: 6px; border-radius: 6px; font-size: 12px;"></div>
+            </div>
+
+            <div style="margin-bottom: 12px;">
+                <label style="display: block; margin-bottom: 4px; font-size: 13px; font-weight: 600;">Message Content *</label>
+                <textarea id="msgBodyText" name="message" rows="4" style="width: 100%; box-sizing: border-box; padding: 8px; border-radius: 6px; border: 1px solid #cbd5e0;" placeholder="Type your text or image caption here..." required></textarea>
+            </div>
+
+            <div style="margin-bottom: 12px;">
+                <label style="display: block; margin-bottom: 4px; font-size: 13px; font-weight: 600;">Optional Image Attachment</label>
+                <input type="file" id="msgImageFile" name="image" accept="image/jpeg,image/png,image/webp">
+                <small style="color: #718096; display: block; margin-top: 2px;">JPG, PNG, or WEBP under 5MB</small>
+            </div>
+
+            <div id="sendMessageStatus" style="font-size: 13px; margin-top: 8px;"></div>
+
+            <div class="modal-footer" style="margin-top: 16px; display: flex; justify-content: flex-end; gap: 8px;">
+                <button type="button" onclick="closeSendMessageModal()" style="background: #e2e8f0; color: #4a5568; padding: 8px 16px; border-radius: 4px; border: none; cursor: pointer;">Cancel</button>
+                <button type="submit" id="submitMessageBtn" class="btn-primary" style="background-color: #128c7e; color: #fff; padding: 8px 16px; border-radius: 4px; border: none; cursor: pointer;">
+                    Send Message
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Async JavaScript AJAX Handling -->
+<script>
+    const API_BASE_URL = '/api/contacts/';
+    let searchTimeout = null;
+
+    document.addEventListener('DOMContentLoaded', () => {
+        fetchContacts();
+    });
+
+    // CSRF Token Helper for Django
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
                 }
-                console.log(contactData);
+            }
+        }
+        return cookieValue;
+    }
 
-                try{
-                    const response = await fetch('/api/contacts/create/', {
-                        method: 'POST',
-                        headers: {
-                            'content-type': 'application/json',
-                            'X-CSRFToken': document.querySelector('input[name="csrfmiddlewaretoken"]').value
-                        },
-                        body: JSON.stringify(contactData)
-                    })
-                    
-                    const data = await response.json()
+    // ------------------------------------------------------------------
+    // 1. FETCH & FILTER CONTACTS (GET)
+    // ------------------------------------------------------------------
+    async function fetchContacts() {
+        const tableBody = document.getElementById('contactsTableBody');
+        const searchVal = document.getElementById('searchInput').value.trim();
+        const tagVal = document.getElementById('tagFilterInput').value.trim();
+        const optInVal = document.getElementById('optInFilter').value;
 
-                    if(response.ok){
-                        document.getElementById("contact-response").innerText = "✅ Contact saved!";
-                        console.log("Created contact:", data);
-                        form.reset();
-                    } else{
-                        document.getElementById("contact-response").innerText = "❌ Error: " + JSON.stringify(data);
-                        console.error("Validation errors:", data);
-                    } 
+        // Build query string params
+        const params = new URLSearchParams();
+        if (searchVal) params.append('search', searchVal);
+        if (tagVal) params.append('tag', tagVal);
+        if (optInVal !== '') params.append('opt_in', optInVal);
 
-                } catch(error){
-                    console.error("Network error:", error);
-                } 
-            })  
-
-            form2.addEventListener('submit', async (e)=>{
-                e.preventDefault();
-
-                const formData2 = new FormData(form2)
-
-                for (const [key, value] of formData2.entries()) {
-                    console.log(`${key}:`, value);
-                } 
-
-                try{
-                    const response = await fetch('/api/contacts/import-excel/', {
-                        method: 'POST',
-                        headers: {
-                            'X-CSRFToken': document.querySelector('input[name="csrfmiddlewaretoken"]').value
-                        }, 
-                        body: formData2
-                    })
-
-                    const data = await response.json()
-
-                    if (response.status == 207 || response.ok){
-                        const success = data.created?.length || 0;
-                        const failed = data.failed?.length || 0;
-                        const skipped = data.skip_duplicates?.length || 0;
-
-                        document.getElementById('upload-status').innerHTML = `
-                            ✅Imported ${success} contacts successfully. <br>
-                            ❌Failed to import ${failed} contacts.<br>
-                            ⚠️skipped ${skipped} duplicate contacts.`;
-
-                        console.log('Created:', data.created)
-                        console.log('Failed:', data.failed)
-                    } else {
-                        document.getElementById("upload-status").innerText = "❌ " + data.error;
-                        console.error("Error:", data.error);
-                    } 
-                    
-                } catch(error){
-                    console.error("Network error:", error); 
+        try {
+            const response = await fetch(`${API_BASE_URL}?${params.toString()}`, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
                 }
+            });
 
-            })
-        })   
-    </script>
+            if (!response.ok) throw new Error("Failed to load contacts list.");
+
+            const data = await response.json();
+            renderContactsTable(data.results);
+            document.getElementById('tableSummary').innerText = `Total Contacts Found: ${data.total_count}`;
+        } catch (error) {
+            console.error("Error fetching contacts:", error);
+            tableBody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: red;">Failed to load contacts list.</td></tr>`;
+        }
+    }
+
+    let selectedContactPhones = new Set();
+
+    function renderContactsTable(contacts) {
+        const tableBody = document.getElementById('contactsTableBody');
+        if (!contacts || contacts.length === 0) {
+            tableBody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: #718096;">No contacts found in database.</td></tr>`;
+            return;
+        }
+
+        tableBody.innerHTML = contacts.map(contact => {
+            const tagsHtml = (contact.tag || []).map(t => `<span class="badge">${t}</span>`).join('');
+            const consentBadge = contact.is_opted_in 
+                ? `<span class="badge status-opted-in">Opted In</span>` 
+                : `<span class="badge status-opted-out">Opted Out</span>`;
+            
+                const isChecked = selectedContactPhones.has(contact.phone_number) ? 'checked' : '';
+
+            return `
+                <tr>
+                    <td>
+                        <input type="checkbox" class="contact-checkbox" value="${contact.phone_number}" ${isChecked} onchange="handleCheckboxChange(this)">
+                    </td>
+                    <td><strong>${contact.name || '—'}</strong></td>
+                    <td>+${contact.phone_number}</td>
+                    <td>${contact.email || '—'}</td>
+                    <td>${tagsHtml || '<span style="color:#cbd5e0;">No tags</span>'}</td>
+                    <td>${consentBadge}</td>
+                    <td>
+                        <button class="btn-danger" onclick="deleteContact('${contact.id}')">Delete</button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+
+        updateSelectedCountUI();
+    }
+
+    // Checkbox selection state managers
+    function handleCheckboxChange(cb) {
+        if (cb.checked) {
+            selectedContactPhones.add(cb.value);
+        } else {
+            selectedContactPhones.delete(cb.value);
+        }
+        updateSelectedCountUI();
+    }
+
+    function toggleSelectAll(masterCb) {
+        const checkboxes = document.querySelectorAll('.contact-checkbox');
+        checkboxes.forEach(cb => {
+            cb.checked = masterCb.checked;
+            if (masterCb.checked) {
+                selectedContactPhones.add(cb.value);
+            } else {
+                selectedContactPhones.delete(cb.value);
+            }
+        });
+        updateSelectedCountUI();
+    }
+
+    function updateSelectedCountUI() {
+        const size = selectedContactPhones.size;
+        document.getElementById('selectedCount').innerText = size;
+        const msgCountEl = document.getElementById('selectedMsgCount');
+        if (msgCountEl) msgCountEl.innerText = size;
+    }
+
+    // Send Direct Message Event Listener (Handles FormData for image files)
+    document.getElementById('sendMessageForm').addEventListener('submit', async function (e) {
+        e.preventDefault();
+
+        const statusDiv = document.getElementById('sendMessageStatus');
+        const submitBtn = document.getElementById('submitMessageBtn');
+        const recipientPhones = Array.from(selectedContactPhones);
+        const messageText = document.getElementById('msgBodyText').value.trim();
+        const imageInput = document.getElementById('msgImageFile');
+
+        if (!messageText) {
+            statusDiv.innerHTML = `<span style="color: red;">Please provide message content.</span>`;
+            return;
+        }
+
+        submitBtn.disabled = true;
+        submitBtn.innerText = "Dispatching...";
+        statusDiv.innerHTML = `<span style="color: #3182ce;">Dispatching message to Meta API...</span>`;
+
+        // Construct FormData for multipart transmission
+        const formData = new FormData();
+        formData.append('phone_number', recipientPhones.join(','));
+        formData.append('message', messageText);
+
+        if (imageInput.files.length > 0) {
+            formData.append('image', imageInput.files[0]);
+        }
+
+        try {
+            const response = await fetch('/account/api/whatsapp/send-message/', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCookie('csrftoken')
+                    // Note: Do not set Content-Type header when sending FormData! Browser sets boundary automatically.
+                },
+                body: formData
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                statusDiv.innerHTML = `
+                    <div style="color: green; font-weight: 600;">
+                        ✔ ${data.detail}<br>
+                        Sent: ${data.summary.total_successful} | Failed: ${data.summary.total_failed}
+                    </div>
+                `;
+                setTimeout(() => {
+                    closeSendMessageModal();
+                    selectedContactPhones.clear();
+                    updateSelectedCountUI();
+                    fetchContacts();
+                }, 2000);
+            } else {
+                statusDiv.innerHTML = `<div style="color: red; font-weight: 600;">❌ ${data.detail || 'Failed to dispatch message.'}</div>`;
+            }
+        } catch (error) {
+            console.error("Send message error:", error);
+            statusDiv.innerHTML = `<div style="color: red; font-weight: 600;">Network error. Check connection.</div>`;
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.innerText = "Send Message";
+        }
+    });
+
+    // ------------------------------------------------------------------
+    // 2. MODAL CONTROLS & POPULATION FOR DIRECT MESSAGE
+    // ------------------------------------------------------------------
+    function openSendMessageModal() {
+        if (selectedContactPhones.size === 0) {
+            alert("Please select at least one contact to send a message.");
+            return;
+        }
+
+        const recipientsDiv = document.getElementById('msgSelectedRecipients');
+        recipientsDiv.innerHTML = Array.from(selectedContactPhones)
+            .map(phone => `<span class="badge" style="margin-bottom:4px; display:inline-block; background:#e2e8f0; padding:2px 6px; border-radius:4px; font-size:11px;">+${phone}</span>`)
+            .join(' ');
+
+        document.getElementById('sendMessageStatus').innerText = '';
+        document.getElementById('sendMessageModal').style.display = 'flex';
+    }
+
+    function closeSendMessageModal() {
+        document.getElementById('sendMessageForm').reset();
+        document.getElementById('sendMessageModal').style.display = 'none';
+    }
+
+    // ------------------------------------------------------------------
+    // 2. MODAL CONTROLS & POPULATION FOR CATALOG DISPATCH
+    // ------------------------------------------------------------------
+    function openSendCatalogModal() {
+        if (selectedContactPhones.size === 0) {
+            alert("Please select at least one contact from the table to send a catalog.");
+            return;
+        }
+
+        const recipientsDiv = document.getElementById('selectedRecipientsList');
+        const phonesArray = Array.from(selectedContactPhones);
+        recipientsDiv.innerHTML = phonesArray.map(phone => `<span class="badge" style="margin-bottom:4px; display:inline-block;">+${phone}</span>`).join(' ');
+
+        document.getElementById('catalogModalStatus').innerText = '';
+        document.getElementById('sendCatalogModal').style.display = 'flex';
+    }
+
+    function closeSendCatalogModal() {
+        document.getElementById('sendCatalogModal').style.display = 'none';
+    }
+
+    // ------------------------------------------------------------------
+    // 3. TRIGGER SEND CATALOG API (POST)
+    // ------------------------------------------------------------------
+    document.getElementById('sendCatalogForm').addEventListener('submit', async function (e) {
+        e.preventDefault();
+
+        const statusDiv = document.getElementById('catalogModalStatus');
+        const submitBtn = document.getElementById('submitCatalogBtn');
+        const recipientPhones = Array.from(selectedContactPhones);
+
+        submitBtn.disabled = true;
+        submitBtn.innerText = "Dispatching Catalog...";
+        statusDiv.innerHTML = `<span style="color: #3182ce;">Sending WhatsApp interactive messages...</span>`;
+
+        const payload = {
+            recipient_phones: recipientPhones,
+            product_ids: [] // Empty list sends all Meta-synced products by default
+        };
+
+        try {
+            const response = await fetch('/account/send_catalog/', { // Maps directly to send_catalog FBV
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify(payload)
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                statusDiv.innerHTML = `
+                    <div style="color: green; font-weight: 600;">
+                        ✔ ${data.status}<br>
+                        Successful: ${data.summary.total_successful} | Failed: ${data.summary.total_failed}
+                    </div>
+                `;
+                setTimeout(() => {
+                    closeSendCatalogModal();
+                    selectedContactPhones.clear();
+                    updateSelectedCountUI();
+                    fetchContacts();
+                }, 2000);
+            } else {
+                statusDiv.innerHTML = `<div style="color: red; font-weight: 600;">❌ ${data.detail || 'Failed to dispatch catalog.'}</div>`;
+            }
+        } catch (error) {
+            console.error("Send catalog error:", error);
+            statusDiv.innerHTML = `<div style="color: red; font-weight: 600;">Network error. Check server status.</div>`;
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.innerText = "Dispatch Catalog";
+        }
+    });
+
+    function debounceSearch() {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(fetchContacts, 300);
+    }
+
+    function formatPhoneNumber(phone) {
+        let cleaned = phone.replace(/\s+/g, ''); // remove spaces
+
+        // If already in international format
+        if (cleaned.startsWith('+233')) {
+            return cleaned;
+        }
+
+        // If starts with 0 (local number)
+        if (cleaned.startsWith('0')) {
+            cleaned = cleaned.substring(1);
+        }
+
+        // Default: prepend Ghana country code
+        return '+233' + cleaned;
+    }
+
+    // ------------------------------------------------------------------
+    // 2. CREATE SINGLE CONTACT (POST)
+    // ------------------------------------------------------------------
+    document.getElementById('addContactForm').addEventListener('submit', async function (e) {
+        e.preventDefault();
+        const errorDiv = document.getElementById('modalFormError');
+        errorDiv.innerText = '';
+
+        const rawTags = document.getElementById('addTags').value;
+        const tagArray = rawTags ? rawTags.split(',').map(t => t.trim()).filter(Boolean) : [];
+
+        let phone_number = document.getElementById('addPhone').value.trim();
+
+        phone_number = formatPhoneNumber(phone_number);
+
+        const payload = {
+            phone_number: phone_number,
+            name: document.getElementById('addName').value.trim() || null,
+            email: document.getElementById('addEmail').value.trim() || null,
+            tag: tagArray,
+            is_opted_in: true
+        };
+
+        try {
+            const response = await fetch(API_BASE_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify(payload)
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                closeAddModal();
+                fetchContacts(); // Refresh list
+            } else {
+                // Parse DRF validation errors
+                if (data.phone_number) {
+                    errorDiv.innerText = data.phone_number[0];
+                } else {
+                    errorDiv.innerText = data.error || "Failed to create contact.";
+                }
+            }
+        } catch (error) {
+            console.error("Create contact error:", error);
+            errorDiv.innerText = "Network error. Please try again.";
+        }
+    });
+
+    // ------------------------------------------------------------------
+    // 3. BULK FILE UPLOAD (.CSV / .XLSX)
+    // ------------------------------------------------------------------
+    document.getElementById('fileUploadForm').addEventListener('submit', async function (e) {
+        e.preventDefault();
+        const fileInput = document.getElementById('contactSpreadsheet');
+        const statusDiv = document.getElementById('uploadStatusMessage');
+        const uploadBtn = document.getElementById('uploadBtn');
+
+        if (!fileInput.files.length) {
+            alert("Please select an Excel or CSV file first.");
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('file', fileInput.files[0]);
+
+        uploadBtn.disabled = true;
+        uploadBtn.innerText = "Processing File...";
+        statusDiv.innerHTML = `<span style="color: #3182ce; font-size: 13px;">Parsing spreadsheet rows, please wait...</span>`;
+
+        try {
+            const response = await fetch('/api/contacts/upload/', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: formData
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                statusDiv.innerHTML = `
+                    <div style="color: green; font-size: 13px; margin-top: 8px;">
+                        ✔ ${data.message} Summary — <strong>Created:</strong> ${data.summary.created} | 
+                        <strong>Updated:</strong> ${data.summary.updated} | 
+                        <strong>Skipped:</strong> ${data.summary.skipped}
+                    </div>
+                `;
+                fileInput.value = '';
+                document.getElementById('fileNameDisplay').innerText = '';
+                fetchContacts(); // Refresh table view
+            } else {
+                statusDiv.innerHTML = `<div style="color: red; font-size: 13px; margin-top: 8px;">❌ ${data.error}</div>`;
+            }
+        } catch (error) {
+            console.error("Upload error:", error);
+            statusDiv.innerHTML = `<div style="color: red; font-size: 13px; margin-top: 8px;">Network connection error.</div>`;
+        } finally {
+            uploadBtn.disabled = false;
+            uploadBtn.innerText = "Upload & Process Contacts";
+        }
+    });
+
+    // ------------------------------------------------------------------
+    // 4. DELETE CONTACT
+    // ------------------------------------------------------------------
+    async function deleteContact(contactId) {
+        if (!confirm("Are you sure you want to delete this contact?")) return;
+
+        try {
+            const response = await fetch(`${API_BASE_URL}${contactId}/`, {
+                method: 'DELETE',
+                headers: {
+                    'X-CSRFToken': getCookie('csrftoken')
+                }
+            });
+
+            if (response.ok) {
+                fetchContacts();
+            } else {
+                alert("Failed to delete contact.");
+            }
+        } catch (error) {
+            console.error("Delete contact error:", error);
+        }
+    }
+
+    // Modal UI Helpers
+    function openAddModal() {
+        document.getElementById('addContactForm').reset();
+        document.getElementById('modalFormError').innerText = '';
+        document.getElementById('addContactModal').style.display = 'flex';
+    }
+
+    function closeAddModal() {
+        document.getElementById('addContactModal').style.display = 'none';
+    }
+
+    function updateFileNameDisplay() {
+        const fileInput = document.getElementById('contactSpreadsheet');
+        const display = document.getElementById('fileNameDisplay');
+        display.innerText = fileInput.files.length ? fileInput.files[0].name : '';
+    }
+</script>
+
 </body>
 </html>

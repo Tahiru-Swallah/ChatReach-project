@@ -16,6 +16,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 # LOCAL LIBRARIES
 from .models import CustomUser, Business, WhatsAppConnection, Product, ProductImage
+from user_business.models import CustomerContact, WhatsAppTemplate
 from .serializer import CustomTokenObtainPairSerializer, RegisterSerializer, BusinessSerializer, WhatsAppConnectionSerializer, ProductSerializer, ProductImageSerializer, MetaCatalogBatchSerializer
 from django.db import transaction
 from django.utils import timezone
@@ -28,7 +29,8 @@ from allauth.socialaccount.providers.google.views import GoogleOAuth2Adapter
 from allauth.socialaccount.providers.oauth2.client import OAuth2Client
 
 import requests
-from .service import exchange_auth_code_for_token, extract_waba_id, subscribe_waba_to_webhook, link_catalog_to_waba, fetch_primary_phone_number, save_to_whatsapp_connection, create_or_get_meta_catalog, get_waba_business_id, upload_products_batch_to_meta, send_whatsApp_catalog_message
+from .service import exchange_auth_code_for_token, extract_waba_id, subscribe_waba_to_webhook, link_catalog_to_waba, fetch_primary_phone_number, save_to_whatsapp_connection, create_or_get_meta_catalog, get_waba_business_id, upload_products_batch_to_meta, send_whatsApp_catalog_message, send_whatsapp_direct_message
+
 class GoogleLoginAPI(SocialLoginView):
     adapter_class = GoogleOAuth2Adapter
 
@@ -214,137 +216,81 @@ def create_business_profile(request):
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
-def sendWhatsAppMessage(request):
-    recipient_phone = request.data.get("phone_number")
-    image_file = request.FILES.get("image")
-    message_text = request.data.get("message")
+@parser_classes([MultiPartParser, FormParser, JSONParser])  # Accepts both JSON & Multipart Form Data
+def send_whatsapp_message(request):
+    """
+    POST payload (FormData or JSON):
+    - phone_number: List or comma-separated string of phones
+    - message: Plain text body or image caption
+    - image: Optional uploaded file
+    """
+    user = request.user
 
-    if isinstance(recipient_phone, str):
-        phone_numbers = [p.strip() for p in recipient_phone.split(',') if p.strip()]
-    elif isinstance(recipient_phone, list):
-        phone_numbers = [str(p).strip() for p in recipient_phone if str(p).strip()]
-    else:   
-        phone_numbers = []
+    # 1. Multi-Tenant Business Check
+    business = getattr(user, 'owned_businesses', None)
+    business = business.first() if business else None
 
-
-    # 1. Validate required request payload
-    if not phone_numbers or not message_text:
+    if not business:
         return Response(
-            {"detail": "All fields 'phone_number' and 'message' are required."},
+            {'detail': 'Business Portfolio not available for this account.'},
             status=status.HTTP_400_BAD_REQUEST
         )
 
-    # 2. Retrieve the active WhatsApp connection for the authenticated user's business
+    # 2. Connection Check
     try:
-        business = request.user.owned_businesses.first()  # Assuming a user can own multiple businesses, adjust as needed
         connection = WhatsAppConnection.objects.get(
             business=business,
             status=WhatsAppConnection.Status.CONNECTED
         )
-    except getattr(request.user, 'owned_businesses', None) is None:
-        return Response(
-            {"detail": "No business profile associated with this user."},
-            status=status.HTTP_400_BAD_REQUEST
-        )
     except WhatsAppConnection.DoesNotExist:
         return Response(
-            {"detail": "No active WhatsApp connection found for this business. Please connect your account first."},
-            status=status.HTTP_404_NOT_FOUND
+            {'detail': 'No active WhatsApp connection found. Please connect your Meta account.'},
+            status=status.HTTP_400_BAD_REQUEST
         )
 
-    # 4. Dispatch Message to Meta Graph API
-    graph_version = getattr(settings, 'GRAPH_API_VERSION', 'v21.0')
-    auth_headers = {'Authorization': f'Bearer {connection.access_token}'}
+    # 3. Payload Parsing & Validation
+    raw_phones = request.data.get('phone_number') or request.data.get('recipient_phones')
+    message_text = request.data.get('message')
+    image_file = request.FILES.get('image')
 
-    media_id = None
+    if not raw_phones or not message_text:
+        return Response(
+            {'detail': "Both 'phone_number' and 'message' parameters are required."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
-    if image_file:
-        upload_url = f"https://graph.facebook.com/{graph_version}/{connection.phone_number_id}/media"
-        files = {
-            'file': (image_file.name, image_file.read(), image_file.content_type),
-            'messaging_product': (None, 'whatsapp')
-        }
-        try:
-            upload_res = requests.post(upload_url, headers=auth_headers, files=files, timeout=15)
-            upload_data = upload_res.json()
+    if isinstance(raw_phones, str):
+        recipient_phones = [p.strip().lstrip('+') for p in raw_phones.split(',') if p.strip()]
+    elif isinstance(raw_phones, list):
+        recipient_phones = [str(p).strip().lstrip('+') for p in raw_phones if str(p).strip()]
+    else:
+        recipient_phones = [str(raw_phones).strip().lstrip('+')]
 
-            if upload_res.status_code == 200:
-                media_id = upload_data.get('id')
-            else:
-                return Response({
-                    "success": False,
-                    "detail": "Failed to upload image file to Meta Media server.",
-                    "error": upload_data.get("error", upload_data)
-                }, status=upload_res.status_code)
-        except requests.exceptions.RequestException as e:
-            return Response({
-                "success": False,
-                "detail": f"Network error uploading media to Meta: {str(e)}",
-                "error": str(e)
-            }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+    # 4. Invoke Dispatch Helper
+    result = send_whatsapp_direct_message(
+        phone_number_id=connection.phone_number_id,
+        access_token=connection.access_token,
+        recipient_phones=recipient_phones,
+        message_text=message_text,
+        image_file=image_file
+    )
 
-    json_headers = {
-        "Authorization": f"Bearer {connection.access_token}",
-        "Content-Type": "application/json"
-    }
-
-    message_url = f"https://graph.facebook.com/{graph_version}/{connection.phone_number_id}/messages"
-
-    results = {
-        "success_count": 0,
-        "failed_count": 0,
-        "details": []
-    }
-
-    for recipient_phone in phone_numbers:
-
-        if media_id:
-            json_payload = {
-                "messaging_product": "whatsapp",
-                "to": recipient_phone,
-                "type": "image",
-                "image": {"id": media_id, "caption": message_text}
-            }
-        else:
-            json_payload = {
-                "messaging_product": "whatsapp",
-                "to": recipient_phone,
-                "type": "text",
-                "text": {"body": message_text}
-            }
-
-
-        try:
-            response = requests.post(message_url, headers=json_headers, json=json_payload, timeout=15)
-            response_data = response.json()
-
-            if response.status_code == 200:
-                results['success_count'] += 1
-                results['details'].append({
-                    "phone_number": recipient_phone,
-                    'status': 'sent',
-                    "message_id": response_data.get("messages", [{}])[0].get("id")
-                })
-            else:
-                results['failed_count'] += 1
-                results['details'].append({
-                    "phone": recipient_phone,
-                    "status": "failed",
-                    "error": response_data.get("error", response_data)
-                })
-
-        except requests.exceptions.RequestException as e:
-            results["failed_count"] += 1
-            results["details"].append({
-                "phone": recipient_phone,
-                "status": "failed",
-                "error": f"Network error: {str(e)}"
-            })
+    if not result.get("success", False):
+        return Response({
+            'status': 'error',
+            'detail': result.get("error", "Failed to dispatch WhatsApp message to recipients."),
+            'summary': result
+        }, status=status.HTTP_400_BAD_REQUEST)
 
     return Response({
-        "success": True,
-        "total_recipients": len(phone_numbers),
-        "summary": results
+        'status': 'success',
+        'detail': 'Message broadcast processed.',
+        'summary': {
+            'total_sent': result.get("total_sent", 0),
+            'total_successful': result.get("total_successful", 0),
+            'total_failed': result.get("total_failed", 0)
+        },
+        'results': result.get("recipient_results", [])
     }, status=status.HTTP_200_OK)
 
 
@@ -448,6 +394,23 @@ def whatsApp_webhook(request):
                     value = change.get('value', {})
                     statuses = value.get('statuses', [])
 
+                    metadata = value.get('metadata', {})
+                    display_phone_number_id = metadata.get('phone_number_id')
+
+                    business = None
+                    if display_phone_number_id:
+                        connection = WhatsAppConnection.objects.filter(phone_number_id=display_phone_number_id).first()
+                        if connection:
+                            business = connection.business
+
+                    meta_contacts = value.get('contacts', [])
+                    profile_names_map = {}
+                    for c in meta_contacts:
+                        wa_id = c.get('wa_id')
+                        profile_name = c.get('profile', {}).get('name')
+                        if wa_id and profile_name:
+                            profile_names_map[wa_id] = profile_name
+
                     for status_item in statuses:
                         wamid = status_item.get('id')             # e.g., "wamid.HBgM..."
                         msg_status = status_item.get('status')   # sent, delivered, read, failed
@@ -464,10 +427,60 @@ def whatsApp_webhook(request):
                         # TODO: Update message status in your database model here
                         # MessageLog.objects.filter(wamid=wamid).update(status=msg_status)
 
+                    field = change.get('field')
+                    if field == "message_template_status_update":
+                        tpl_event = value.get('event')  # APPROVED, REJECTED, PAUSED, DISABLED
+                        tpl_id = value.get('message_template_id')
+                        tpl_name = value.get('message_template_name')
+                        tpl_lang = value.get('message_template_language')
+
+                        # Extract detailed rejection info if available
+                        rejection_info = value.get('rejection_info', {})
+                        reason_text = rejection_info.get('reason') or value.get('reason', 'Rejected by Meta')
+
+                        # Find and update local template
+                        template = WhatsAppTemplate.objects.filter(
+                            name=tpl_name,
+                            language=tpl_lang
+                        ).first()
+
+                        if template:
+                            template.status = tpl_event
+                            template.meta_template_id = str(tpl_id) if tpl_id else template.meta_template_id
+                            
+                            if tpl_event == 'REJECTED':
+                                template.rejection_reason = reason_text
+                                
+                            template.save()
+                            print(f"🔄 Webhook Updated Template '{tpl_name}' ({tpl_lang}) status to: {tpl_event}")
+
+
                     messages = value.get('messages', [])
                     for message in messages:
                         from_number = message.get('from')
                         msg_type = message.get('type')
+
+                        # Auto-store contact for current business tenant
+                        if from_number and business:
+                            clean_phone = from_number.lstrip('+')
+                            contact_name = profile_names_map.get(from_number, '')
+
+                            contact, created = CustomerContact.objects.get_or_create(
+                                business=business,
+                                phone_number=clean_phone,
+                                defaults={
+                                    'name': contact_name,
+                                    'is_opted_in': True,
+                                    'tag': ['Inbound Lead', 'WhatsApp']
+                                    }
+                            )
+
+                            if created:
+                                print(f"✨ Auto-created new CustomerContact: +{clean_phone} ({contact_name or 'No Name'})")
+                            elif contact_name and not contact.name:
+                                # Update existing contact if name was previously blank
+                                contact.name = contact_name
+                                contact.save(update_fields=['name'])
 
                         if msg_type == 'text':
                             text_body = message.get('text', {}).get('body')
@@ -655,17 +668,15 @@ def send_catalog(request):
 
     user = request.user
 
-    if hasattr(user, "owned_businesses"):
-        business = user.owned_businesses.first()
-    else:
-        business = None
+    # 1. Safely retrieve Business Tenant
+    business = getattr(user, 'owned_businesses', None)
+    business = business.first() if business else None
 
-    if not business and business == None:
+    if not business:
         return Response(
             {'detail': 'Business Portfolio not available for this account.'},
             status=status.HTTP_400_BAD_REQUEST
         )
-
     try:
         connection = WhatsAppConnection.objects.get(business=business, status=WhatsAppConnection.Status.CONNECTED)
     except WhatsAppConnection.DoesNotExist:
@@ -682,18 +693,18 @@ def send_catalog(request):
         )
 
     if isinstance(raw_phones, str):
-        recipient_phones = [p.strip() for p in raw_phones.split(',') if p.strip()]
+        recipient_phones = [p.strip().lstrip('+') for p in raw_phones.split(',') if p.strip()]
 
     elif isinstance(raw_phones, list):
-        recipient_phones = raw_phones
+        recipient_phones = [str(p).strip().lstrip('+') for p in raw_phones if str(p).strip()]
     else:
-        recipient_phones = [str(raw_phones)]
+        recipient_phones = [str(raw_phones).strip().lstrip('+')]
 
     selected_products_id = request.data.get('product_ids', [])
     product_qs = Product.objects.filter(business=business, is_synced_to_meta=True)
 
     if selected_products_id:
-        product_qs = Product.objects.filter(id__in=selected_products_id)
+        product_qs = product_qs.filter(id__in=selected_products_id)
 
     if not product_qs.exists():
         return Response(

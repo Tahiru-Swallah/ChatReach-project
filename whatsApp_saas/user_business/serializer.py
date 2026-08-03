@@ -1,147 +1,122 @@
 from rest_framework import serializers
-from .models import CustomerContact, ScheduledMessage, MessageTemplate, TemplateCategory, Notification
+from .models import CustomerContact, WhatsAppTemplate
 
 class CustomerContactSerializer(serializers.ModelSerializer):
+    """
+    Serializer for managing individual CustomerContact records.
+    Handles validation, phone sanitization, and multi-tenant scoping.
+    """
+
     class Meta:
         model = CustomerContact
-        fields = ['id', 'user', 'name', 'phone_number', 'email', 'tag', 'created_on']
-        read_only_fields = ['id', 'user', 'created_on']
-
-    def create(self, validated_data):
-        validated_data['user'] = self.context['request'].user
-        return super().create(validated_data)
-    
-
-class ScheduledMessageSerializer(serializers.ModelSerializer):
-    contacts = serializers.PrimaryKeyRelatedField(
-        many=True, queryset=CustomerContact.objects.all()
-    )
-
-    class Meta:
-        model = ScheduledMessage
         fields = [
             'id',
-            'user',
-            'contacts',
-            'message',
-            'media',
-            'scheduled_time',
-            'status',
-            'created_at',
-            'updated_at',
-        ]
-        read_only_fields = ['id', 'user', 'status', 'created_at', 'updated_at']
-
-    def create(self, validated_data):
-        user = self.context['request'].user
-        validated_data['user'] = user
-        return super().create(validated_data)
-
-class MessageTemplateSerializer(serializers.ModelSerializer):
-    attachment = serializers.FileField(required=False, allow_null=True)
-    external_link = serializers.URLField(required=False, allow_blank=True, allow_null=True)
-
-    class Meta:
-        model = MessageTemplate
-        fields = [
-            'id',
-            'user',
-            'title',
-            'template_name',
-            'language',
-            'placeholders',
-            'category',
-            'attachment',
-            'external_link',
-            'is_favorite',
-            'created_at',
-        ]
-        read_only_fields = ['user', 'created_at']
-
-    def create(self, validated_data):
-        validated_data['user'] = self.context['request'].user
-        return super().create(validated_data)
-class TemplateCategorySerializer(serializers.ModelSerializer):
-    name = serializers.ChoiceField(choices=TemplateCategory.CATEGORY_CHOICES)
-
-    class Meta:
-        model = TemplateCategory
-        fields = [
-            'id',
+            'business',
             'name',
-            'user',
-            'created_at'
+            'phone_number',
+            'email',
+            'tag',
+            'is_opted_in',
+            'attributes',
+            'created_on',
+            'updated_at'
         ]
-        read_only_fields = ['id', 'user', 'created_at']
+        read_only_fields = ['id', 'business', 'created_on', 'updated_at']
+
+    def validate_phone_number(self, value):
+        """
+        Clean the phone number input before saving/validating against DB rules.
+        """
+
+        if value:
+            # Strip whitespace and leading '+'
+            cleaned_number = value.strip().lstrip('+')
+            return cleaned_number
+        return value
 
     def validate(self, attrs):
-        user = self.context['request'].user
-        name = attrs.get('name')
+        """
+        Ensure duplicate contacts per business are caught early in validation 
+        before hitting the database UniqueConstraint exception.
+        """
 
-        if TemplateCategory.objects.filter(user=user, name=name).exists():
-            raise serializers.ValidationError(
-                {"name": "You already have a category with this name."}
-            )
+        request = self.context.get('request')
+        phone_number = attrs.get('phone_number')
+
+        if request and hasattr(request, 'user') and hasattr(request.user, 'owned_businesses'):
+            business = request.user.owned_businesses.first()  # Assuming single business context for now
+
+            existing_query = CustomerContact.objects.filter(business=business, phone_number=phone_number)
+
+            if self.instance:
+                # Exclude the current instance when updating
+                existing_query = existing_query.exclude(pk=self.instance.pk)
+
+            if existing_query.exists():
+                raise serializers.ValidationError(
+                    {"phone_number": "This phone number already exists in your contact list."}
+                )
+
         return attrs
 
     def create(self, validated_data):
-        validated_data['user'] = self.context['request'].user
+        """
+        Automatically bind the authenticated user's Business instance.
+        """
+        request = self.context.get('request')
+        if request and hasattr(request.user, 'owned_businesses'):
+            validated_data['business'] = request.user.owned_businesses.first()
         return super().create(validated_data)
 
-class MessageTemplateSerializer(serializers.ModelSerializer):
-    attachment = serializers.FileField(required=False, allow_null=True)
-    external_link = serializers.URLField(required=False, allow_blank=True, allow_null=True)
-    
-    # Accept category ID from POST data
-    category = serializers.PrimaryKeyRelatedField(
-        queryset=TemplateCategory.objects.all(),
-        write_only=True
-    )
+class BulkCustomerContactSerializer(serializers.Serializer):
+    """
+    Specialized Serializer to handle batch CSV/Excel/JSON bulk imports efficiently.
+    Accepts an array of contact objects.
+    """
 
-    # Return nested category in the response
-    category_detail = TemplateCategorySerializer(source='category', read_only=True)
-
-    class Meta:
-        model = MessageTemplate
-        fields = [
-            'id',
-            'user',
-            'title',
-            'template_name',
-            'language',
-            'placeholders',
-            'category',
-            'category_detail',
-            'attachment',
-            'external_link',
-            'is_favorite',
-            'created_at',
-        ]
-        read_only_fields = ['id', 'user', 'created_at']
+    contacts = CustomerContactSerializer(many=True)
 
     def create(self, validated_data):
-        validated_data['user'] = self.context['request'].user
-        return super().create(validated_data)
-    
-    def validate_attachment(self, value):
-        if value and not value.name.lower().endswith(('.pdf', '.jpg', '.jpeg', '.png', '.docx')):
-            raise serializers.ValidationError("Unsupported file type.")
-        return value
+        request = self.context.get('request')
+        business = request.user.owned_businesses.first() if request and hasattr(request.user, 'owned_businesses') else None
 
-class RelatedObjectField(serializers.Field):
-    def to_representation(self, value):
-        if value is None:
-            return None
-        
+        contacts_data = validated_data.get('contacts', [])
+        created_contacts = []
+        updated_contacts = []
+
+        for item in contacts_data:
+            phone = item.get('phone_number')
+
+            # Perform upsert (update existing or create new)
+            contact, created = CustomerContact.objects.update_or_create(
+                business=business,
+                phone_number=phone,
+                defaults = {
+                    'name': item.get('name', ''),
+                    'email': item.get('email', None),
+                    'tag': item.get('tag', []),
+                    'is_opted_in': item.get('is_opted_in', True),
+                    'attributes': item.get('attributes', {}),
+                }
+            )
+
+            if created:
+                created_contacts.append(contact)
+            else:
+                updated_contacts.append(contact)
+
         return {
-            'type': value.__class__.__name__,
-            'id': str(value.id),
-            'string': str(value)
+            'created_count': len(created_contacts),
+            'updated_count': len(updated_contacts),
+            'total': len(contacts_data)
         }
-    
-class NotificationSerializer(serializers.ModelSerializer):
-    related_object = RelatedObjectField(read_only=True)
 
+class WhatsAppTemplateSerializer(serializers.ModelSerializer):
     class Meta:
-        model = Notification
-        fields = ['id', 'user', 'title', 'message', 'type', 'is_read', 'created_at', 'related_object']
+        model = WhatsAppTemplate
+        fields = [
+            'id', 'name', 'category', 'language', 'status',
+            'header_type', 'header_text', 'body_text', 'footer_text',
+            'meta_template_id', 'rejection_reason', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'status', 'meta_template_id', 'rejection_reason', 'created_at', 'updated_at']

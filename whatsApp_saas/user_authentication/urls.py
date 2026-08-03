@@ -26,7 +26,7 @@ urlpatterns = [
     path('business/profile/', views.business_profile_form, name='business_profile'),
     path('api/business/profile/create/', views.create_business_profile),
 
-    path('api/whatsapp/send-message/', views.sendWhatsAppMessage, name='send_whatsApp_message'),
+    path('api/whatsapp/send-message/', views.send_whatsapp_message, name='send_whatsApp_message'),
 
     path('api/whatsapp/exchange-code/', views.exchange_code_for_access_token, name='exchange_code_for_access_token'),
 

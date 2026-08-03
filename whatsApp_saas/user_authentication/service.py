@@ -567,3 +567,103 @@ def send_whatsApp_catalog_message(phone_number_id, access_token, recipient_phone
         "total_failed": total_failed,
         "recipient_results": results
     }
+
+def send_whatsapp_direct_message(phone_number_id, access_token, recipient_phones, message_text, image_file=None):
+    """
+    Modular helper to send text or image/caption messages to Meta Graph API.
+    Handles media upload first if an image file is attached.
+    """
+    graph_version = getattr(settings, 'GRAPH_API_VERSION', 'v21.0')
+    auth_headers = {'Authorization': f'Bearer {access_token}'}
+    media_id = None
+
+    # 1. Handle Optional Image Upload to Meta Media Endpoint
+    if image_file:
+        upload_url = f"https://graph.facebook.com/{graph_version}/{phone_number_id}/media"
+        # Reset file pointer if read previously
+        image_file.seek(0)
+        files = {
+            'file': (image_file.name, image_file.read(), image_file.content_type),
+            'messaging_product': (None, 'whatsapp')
+        }
+
+        try:
+            upload_res = requests.post(upload_url, headers=auth_headers, files=files, timeout=20)
+            upload_data = upload_res.json()
+
+            if upload_res.status_code == 200:
+                media_id = upload_data.get('id')
+            else:
+                return {
+                    "success": False,
+                    "error": "Failed to upload image file to Meta Media server.",
+                    "details": upload_data.get("error", upload_data)
+                }
+        except requests.exceptions.RequestException as e:
+            return {
+                "success": False,
+                "error": f"Network error during media upload: {str(e)}"
+            }
+
+    # 2. Dispatch Messages to Recipients
+    message_url = f"https://graph.facebook.com/{graph_version}/{phone_number_id}/messages"
+    json_headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json"
+    }
+
+    results = {
+        "total_sent": len(recipient_phones),
+        "total_successful": 0,
+        "total_failed": 0,
+        "recipient_results": []
+    }
+
+    for phone in recipient_phones:
+        clean_phone = phone.lstrip('+')
+
+        if media_id:
+            json_payload = {
+                "messaging_product": "whatsapp",
+                "to": clean_phone,
+                "type": "image",
+                "image": {"id": media_id, "caption": message_text}
+            }
+        else:
+            json_payload = {
+                "messaging_product": "whatsapp",
+                "to": clean_phone,
+                "type": "text",
+                "text": {"body": message_text}
+            }
+
+        try:
+            response = requests.post(message_url, headers=json_headers, json=json_payload, timeout=15)
+            response_data = response.json()
+
+            if response.status_code == 200:
+                results['total_successful'] += 1
+                msg_id = response_data.get("messages", [{}])[0].get("id")
+                results['recipient_results'].append({
+                    "phone_number": clean_phone,
+                    "status": "sent",
+                    "message_id": msg_id
+                })
+            else:
+                results['total_failed'] += 1
+                results['recipient_results'].append({
+                    "phone_number": clean_phone,
+                    "status": "failed",
+                    "error": response_data.get("error", response_data)
+                })
+
+        except requests.exceptions.RequestException as e:
+            results["total_failed"] += 1
+            results["recipient_results"].append({
+                "phone_number": clean_phone,
+                "status": "failed",
+                "error": f"Network error: {str(e)}"
+            })
+            
+    results["success"] = results["total_successful"] > 0
+    return results
